@@ -186,7 +186,6 @@ public class IVFFlatIndex extends Index {
 				int bestCentroid = findCentroid(samples.get(sampleIndex));
 				clusters.get(bestCentroid).add(sampleIndex);
 			}
-			System.out.println("[" + (it + 1) + " / " + NUM_ITERATIONS + "]");
 			// Adjust centroids
 			for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
 				VectorConstant meanCentroid = VectorConstant.zeros(dimension);
@@ -195,16 +194,20 @@ public class IVFFlatIndex extends Index {
 					meanCentroid = (VectorConstant) meanCentroid.add(samples.get(sampleIndex));
 				meanCentroid = (VectorConstant) meanCentroid.div(new IntegerConstant(clusterSize));
 				centroids[centroidIndex] = meanCentroid;
-				System.out.println("Centroid " + centroidIndex + " has " + clusterSize + " vectors.");
 			}
 		}
 		// Assign each record to the nearest centroid
-		int ctr = 0;
 		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
 			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
-			++ctr;
 		}
-		System.out.println("Populated " + ctr + " vectors into index.");
+		// Sanity check
+		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
+			beforeFirst(new SearchRange(new SearchKey(new IntegerConstant(centroidId))));
+			int cnt = 0;
+			while(next())
+				++cnt;
+			System.out.println("Centroid " + centroidId + " has " + cnt + "entries");
+		}
 	}
 
     /**
@@ -223,8 +226,8 @@ public class IVFFlatIndex extends Index {
 			throw new UnsupportedOperationException();
 		currentCentroid = processSearchRange(searchRange);
 		// Open corresponding centroid record file
-		String tblname = ii.indexName() + currentCentroid;
-		TableInfo ti = new TableInfo(tblname, schema());
+		String tblName = ii.indexName() + currentCentroid;
+		TableInfo ti = new TableInfo(tblName, schema());
 		this.rf = ti.open(tx, false);
 		// Initialize the file header if needed
 		if (rf.fileSize() == 0)
@@ -336,7 +339,7 @@ public class IVFFlatIndex extends Index {
 				return;
 			}
 		// Optimization: store the search key as the centroidId (saves space!)
-		key = new SearchKey(new BigIntConstant(Long.valueOf(currentCentroid)));
+		key = new SearchKey(new IntegerConstant(currentCentroid));
 		// Log the logical operation ends
 		if (doLogicalLogging)
 			tx.recoveryMgr().logIndexDeletionEnd(ii.indexName(), key,

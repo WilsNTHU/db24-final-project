@@ -39,4 +39,13 @@ public class EuclideanFn extends DistanceFn {
         return Math.sqrt(sum);
     }
     
+    public static void main(String[] args) {
+        VectorConstant v1 = new VectorConstant(new float[] {1, 2, 3, 4, 5});
+        VectorConstant v2 = new VectorConstant(new float[] {1, 2, 3, 4, 5});
+
+        EuclideanFn euc = new EuclideanFn("dummy");
+        euc.setQueryVector(v1);
+
+        System.out.println(euc.distance(v2));
+    }
 }
