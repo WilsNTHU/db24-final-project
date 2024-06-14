@@ -26,6 +26,8 @@ import org.vanilladb.core.query.algebra.TablePlan;
 import org.vanilladb.core.query.algebra.index.IndexSelectPlan;
 import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.sql.ConstantRange;
+import org.vanilladb.core.sql.VectorConstant;
+import org.vanilladb.core.sql.distfn.DistanceFn;
 import org.vanilladb.core.sql.predicate.Predicate;
 import org.vanilladb.core.storage.index.IndexType;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
@@ -47,6 +49,19 @@ public class IndexSelector {
 		}
 		
 		return selectByBestMatchedIndex(candidates, tablePlan, pred, tx);
+	}
+
+	public static IndexSelectPlan selectByBestMatchedIndex(String tblName,
+			TablePlan tablePlan, DistanceFn embField, Transaction tx) {
+		Set<IndexInfo> candidates = new HashSet<IndexInfo>();
+		for (String fieldName : VanillaDb.catalogMgr().getIndexedFields(tblName, tx)) {
+			if (!embField.fieldName().equals(fieldName))
+				continue;
+			
+			List<IndexInfo> iis = VanillaDb.catalogMgr().getIndexInfo(tblName, fieldName, tx);
+			candidates.addAll(iis);
+		}		
+		return selectByBestMatchedIndex(candidates, tablePlan, embField, tx);
 	}
 	
 	public static IndexSelectPlan selectByBestMatchedIndex(String tblName,
@@ -110,5 +125,15 @@ public class IndexSelector {
 		}
 		
 		return null;
+	}
+
+	public static IndexSelectPlan selectByBestMatchedIndex(Set<IndexInfo> candidates,
+			TablePlan tablePlan, DistanceFn embField, Transaction tx) {
+		IndexInfo bestIndex = null;
+		VectorConstant query = embField.getQueryVector();
+		for (IndexInfo ii : candidates) {
+			bestIndex = ii;
+		}
+		return new IndexSelectPlan(tablePlan, bestIndex, query, tx);
 	}
 }

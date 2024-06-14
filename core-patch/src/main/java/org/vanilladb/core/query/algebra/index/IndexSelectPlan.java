@@ -24,7 +24,9 @@ import org.vanilladb.core.query.algebra.TablePlan;
 import org.vanilladb.core.query.algebra.TableScan;
 import org.vanilladb.core.sql.ConstantRange;
 import org.vanilladb.core.sql.Schema;
+import org.vanilladb.core.sql.VectorConstant;
 import org.vanilladb.core.storage.index.Index;
+import org.vanilladb.core.storage.index.SearchKey;
 import org.vanilladb.core.storage.index.SearchKeyType;
 import org.vanilladb.core.storage.index.SearchRange;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
@@ -38,8 +40,8 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class IndexSelectPlan implements Plan {
 	private TablePlan tp;
 	private IndexInfo ii;
-	private boolean vectoredIndex;
 	private Map<String, ConstantRange> searchRanges;
+	private VectorConstant query;
 	private Transaction tx;
 	private Histogram hist;
 
@@ -60,9 +62,20 @@ public class IndexSelectPlan implements Plan {
 			Map<String, ConstantRange> searchRanges, Transaction tx) {
 		this.tp = tp;
 		this.ii = ii;
+		this.query = null;
 		this.searchRanges = searchRanges;
 		this.tx = tx;
 		hist = SelectPlan.constantRangeHistogram(tp.histogram(), searchRanges);
+	}
+
+	public IndexSelectPlan(TablePlan tp, IndexInfo ii,
+			VectorConstant query, Transaction tx) {
+		this.tp = tp;
+		this.ii = ii;
+		this.query = query;
+		this.searchRanges = null;
+		this.tx = tx;
+		hist = tp.histogram();
 	}
 
 	/**
@@ -75,8 +88,11 @@ public class IndexSelectPlan implements Plan {
 		// throws an exception if p is not a tableplan.
 		TableScan ts = (TableScan) tp.open();
 		Index idx = ii.open(tx);
+		if (this.query == null)
+			return new IndexSelectScan(idx, 
+					new SearchRange(ii.fieldNames(), schema(), searchRanges), ts);
 		return new IndexSelectScan(idx, 
-				new SearchRange(ii.fieldNames(), schema(), searchRanges), ts);
+					new SearchRange(new SearchKey(query)), ts);
 	}
 
 	/**
@@ -124,8 +140,12 @@ public class IndexSelectPlan implements Plan {
 		String[] cs = c.split("\n");
 		StringBuilder sb = new StringBuilder();
 		sb.append("->");
-		sb.append("IndexSelectPlan cond:" + searchRanges.toString() + " (#blks="
-				+ blocksAccessed() + ", #recs=" + recordsOutput() + ")\n");
+		if (query == null)
+			sb.append("IndexSelectPlan cond:" + searchRanges.toString() + " (#blks="
+					+ blocksAccessed() + ", #recs=" + recordsOutput() + ")\n");
+		else
+			sb.append("IndexSelectPlan query:" + query.toString() + " (#blks="
+					+ blocksAccessed() + ", #recs=" + recordsOutput() + ")\n");
 		for (String child : cs)
 			sb.append("\t").append(child).append("\n");
 		return sb.toString();

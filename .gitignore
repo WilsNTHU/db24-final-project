@@ -5,6 +5,9 @@
 .classpath
 .project
 
+### dataset ###
+sift.txt
+
 ### Build artifacts ###
 target/
 

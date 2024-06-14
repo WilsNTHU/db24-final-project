@@ -158,6 +158,7 @@ public class IVFFlatIndex extends Index {
 			populationVectors.add((VectorConstant) rf.getVal(fldName));
 			populationRecordIds.add(rf.currentRecordId());
 		}
+        rf.close();
 		// Warning: may fail!
 		int dimension = populationVectors.get(0).dimension();
 		// Optimization: Sampling records to perform K-Means (saves time!)
@@ -198,9 +199,12 @@ public class IVFFlatIndex extends Index {
 			}
 		}
 		// Assign each record to the nearest centroid
+		int ctr = 0;
 		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
 			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
+			++ctr;
 		}
+		System.out.println("Populated " + ctr + " vectors into index.");
 	}
 
     /**
@@ -262,7 +266,7 @@ public class IVFFlatIndex extends Index {
 
 		while (rf.next())
 			return true;
-		return true;
+		return false;
     }
 
 	/**
@@ -292,8 +296,8 @@ public class IVFFlatIndex extends Index {
 		// Search the position
 		beforeFirst(new SearchRange(key));
 		// Log the logical operation starts
-		if (doLogicalLogging)
-			tx.recoveryMgr().logLogicalStart();
+		// if (doLogicalLogging)
+		//	tx.recoveryMgr().logLogicalStart();
 		// Insert the data
 		rf.insert();
 		// Optimization: store the search key as the centroidId (saves space!)
@@ -303,9 +307,9 @@ public class IVFFlatIndex extends Index {
 		rf.setVal(SCHEMA_RID_BLOCK, new BigIntConstant(dataRecordId.block().number()));
 		rf.setVal(SCHEMA_RID_ID, new IntegerConstant(dataRecordId.id()));
 		// Log the logical operation ends
-		if (doLogicalLogging)
-			tx.recoveryMgr().logIndexInsertionEnd(ii.indexName(), key, 
-					dataRecordId.block().number(), dataRecordId.id());
+		// if (doLogicalLogging)
+		// 	tx.recoveryMgr().logIndexInsertionEnd(ii.indexName(), key, 
+		//			dataRecordId.block().number(), dataRecordId.id());
 	}
 
 	/**
@@ -387,7 +391,7 @@ public class IVFFlatIndex extends Index {
 	private float computeDistance(VectorConstant v1, VectorConstant v2) {
 		float distance = 0;
 		VectorConstant subtractedVector = (VectorConstant) v1.sub(v2);
-		for (int i = 0; i < subtractedVector.length(); ++i) {
+		for (int i = 0; i < subtractedVector.dimension(); ++i) {
 			distance += subtractedVector.get(i) * subtractedVector.get(i);
 		}
 		return (float) Math.sqrt(distance);
