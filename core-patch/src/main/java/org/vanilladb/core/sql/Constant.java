@@ -25,7 +25,7 @@ import static java.sql.Types.ARRAY;
  * An abstract class that denotes a value of a supported {@link Type type}.
  */
 public abstract class Constant implements Comparable<Constant> {
-	// Optimization: Materialize the each type of constant with defual value
+	// Optimization: Materialize the each type of constant with default value
 	private static final Constant defaultInteger = new IntegerConstant(0);
 	private static final Constant defaultBigInt = new BigIntConstant(0);
 	private static final Constant defaultDouble = new DoubleConstant(0);

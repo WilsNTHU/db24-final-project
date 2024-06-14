@@ -28,7 +28,7 @@ import org.vanilladb.core.sql.Type;
 public class SearchRange {
 
 	private ConstantRange[] ranges;
-	private SearchKey min, max;
+	private SearchKey min, max, key;
 
 	public SearchRange(List<String> indexedFields, Schema tblSch, Map<String, ConstantRange> specifiedRanges) {
 		ranges = new ConstantRange[indexedFields.size()];
@@ -61,10 +61,13 @@ public class SearchRange {
 	}
 
 	public SearchRange(SearchKey key) {
+		this.key = key;
+		/*
 		ranges = new ConstantRange[key.length()];
 		for (int i = 0; i < ranges.length; i++) {
 			ranges[i] = ConstantRange.newInstance(key.get(i));
 		}
+		*/
 	}
 
 	public SearchRange(ConstantRange... constantRanges) {
@@ -159,9 +162,10 @@ public class SearchRange {
 	 * @return if this range represents a single key
 	 */
 	public boolean isSingleValue() {
-		for (ConstantRange range : ranges)
-			if (!range.isConstant())
-				return false;
+		if (ranges != null)
+			for (ConstantRange range : ranges)
+				if (!range.isConstant())
+					return false;
 		return true;
 	}
 
@@ -172,9 +176,12 @@ public class SearchRange {
 	 * @return a SearchKey represents the range
 	 */
 	public SearchKey asSearchKey() {
-		Constant[] vals = new Constant[ranges.length];
-		for (int i = 0; i < vals.length; i++)
-			vals[i] = ranges[i].asConstant();
-		return new SearchKey(vals);
+		if (key == null) {
+			Constant[] vals = new Constant[ranges.length];
+			for (int i = 0; i < vals.length; i++)
+				vals[i] = ranges[i].asConstant();
+			return new SearchKey(vals);
+		}
+		return key;
 	}
 }

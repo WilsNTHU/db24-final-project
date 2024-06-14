@@ -34,6 +34,8 @@ import org.vanilladb.core.sql.RecordComparator;
 import org.vanilladb.core.sql.VectorConstant;
 import org.vanilladb.core.sql.distfn.DistanceFn;
 import org.vanilladb.core.sql.distfn.EuclideanFn;
+import org.vanilladb.core.storage.index.Index;
+import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.tx.Transaction;
 
 public class StoredProcedureUtils {
@@ -141,4 +143,10 @@ public class StoredProcedureUtils {
 	public static int executeInsert(InsertData sql, Transaction tx) {
 		return VanillaDb.newPlanner().executeInsert(sql, tx);
 	}
+
+	public static void executeTrainIndex(String tblName, List<String> idxFields, String idxName, Transaction tx) {
+        IndexInfo indexInfo = VanillaDb.catalogMgr().getIndexInfoByName(idxName, tx);
+        Index index = indexInfo.open(tx);
+        index.buildIndex();
+    }
 }

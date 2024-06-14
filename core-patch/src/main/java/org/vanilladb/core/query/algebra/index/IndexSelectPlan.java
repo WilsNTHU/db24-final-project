@@ -38,6 +38,7 @@ import org.vanilladb.core.storage.tx.Transaction;
 public class IndexSelectPlan implements Plan {
 	private TablePlan tp;
 	private IndexInfo ii;
+	private boolean vectoredIndex;
 	private Map<String, ConstantRange> searchRanges;
 	private Transaction tx;
 	private Histogram hist;

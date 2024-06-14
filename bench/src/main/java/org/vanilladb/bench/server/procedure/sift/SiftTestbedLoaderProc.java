@@ -36,11 +36,18 @@ public class SiftTestbedLoaderProc extends StoredProcedure<SiftTestbedLoaderPara
         // Generate item records
         generateItems(0);
 
-        // if (logger.isLoggable(Level.INFO))
-        //     logger.info("Training IVF index...");
+        if (logger.isLoggable(Level.INFO))
+            logger.info("Creating indexes...");
 
-        // StoredProcedureUtils.executeTrainIndex(getHelper().getTableName(), getHelper().getIdxFields(), 
-        //     getHelper().getIdxName(), getTransaction());
+        // Create indexes
+        for (String sql : getHelper().getIndexSchemas())
+            StoredProcedureUtils.executeUpdate(sql, getTransaction());
+
+        if (logger.isLoggable(Level.INFO))
+            logger.info("Training IVF index...");
+
+        StoredProcedureUtils.executeTrainIndex(getHelper().getTableName(), getHelper().getIdxFields(), 
+            getHelper().getIdxName(), getTransaction());
 
         if (logger.isLoggable(Level.INFO))
             logger.info("Loading completed. Flush all loading data to disks...");
@@ -72,13 +79,6 @@ public class SiftTestbedLoaderProc extends StoredProcedure<SiftTestbedLoaderPara
 
         for (String sql : paramHelper.getTableSchemas())
             StoredProcedureUtils.executeUpdate(sql, tx);
-
-        // if (logger.isLoggable(Level.INFO))
-        //     logger.info("Creating indexes...");
-
-        // // Create indexes
-        // for (String sql : paramHelper.getIndexSchemas())
-        //     StoredProcedureUtils.executeUpdate(sql, tx);
         
         if (logger.isLoggable(Level.FINE))
             logger.info("Finish creating schemas.");

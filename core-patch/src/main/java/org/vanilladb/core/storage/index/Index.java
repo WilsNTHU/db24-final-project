@@ -17,6 +17,7 @@ package org.vanilladb.core.storage.index;
 
 import org.vanilladb.core.storage.index.btree.BTreeIndex;
 import org.vanilladb.core.storage.index.hash.HashIndex;
+import org.vanilladb.core.storage.index.ivfflat.IVFFlatIndex;
 // import org.vanilladb.core.storage.index.lsh.LSHashIndex;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordId;
@@ -52,6 +53,8 @@ public abstract class Index {
 			return HashIndex.searchCost(keyType, totRecs, matchRecs);
 		else if (idxType == IndexType.BTREE)
 			return BTreeIndex.searchCost(keyType, totRecs, matchRecs);
+		else if (idxType == IndexType.IVF)
+			return IVFFlatIndex.searchCost(keyType, totRecs, matchRecs);
 		else
 			throw new IllegalArgumentException("unsupported index type");
 	}
@@ -61,6 +64,8 @@ public abstract class Index {
 			return new HashIndex(ii, keyType, tx);
 		else if (ii.indexType() == IndexType.BTREE)
 			return new BTreeIndex(ii, keyType, tx);
+		else if (ii.indexType() == IndexType.IVF)
+			return new IVFFlatIndex(ii, keyType, tx);
 		// else if (ii.indexType() == IndexType.LSH)
 		// 	return new LSHashIndex(ii, keyType, tx);
 		else
@@ -154,5 +159,12 @@ public abstract class Index {
 
 	public SearchKeyType getKeyType() {
 		return keyType;
+	}
+
+	/**
+	 * Trains the index (if necessary)
+	 */
+	public void buildIndex() {
+
 	}
 }
