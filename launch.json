@@ -11,7 +11,7 @@
             "mainClass": "org.vanilladb.bench.server.StartUp",
             "projectName": "bench",
             "args": "benchDB",
-            "vmArgs": "--add-modules=jdk.incubator.vector -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
+            "vmArgs": "--add-modules=jdk.incubator.vector -XX:-UseSuperWord -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
         },
         {
             "type": "java",
@@ -20,7 +20,7 @@
             "mainClass": "org.vanilladb.bench.App",
             "projectName": "bench",
             "args": "1",
-            "vmArgs": "--add-modules=jdk.incubator.vector -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
+            "vmArgs": "--add-modules=jdk.incubator.vector -XX:-UseSuperWord -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
         },
         {
             "type": "java",
@@ -29,7 +29,7 @@
             "mainClass": "org.vanilladb.bench.App",
             "projectName": "bench",
             "args": "2",
-            "vmArgs": "--add-modules=jdk.incubator.vector -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
+            "vmArgs": "--add-modules=jdk.incubator.vector -XX:-UseSuperWord -Djava.util.logging.config.file=bench/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.bench.config.file=bench/target/classes/org/vanilladb/bench/vanillabench.properties -Dorg.vanilladb.core.config.file=bench/target/classes/org/vanilladb/core/vanilladb.properties"
         },
         {
             "type": "java",
@@ -38,7 +38,7 @@
             "mainClass": "org.vanilladb.core.server.StartUp",
             "projectName": "core-patch",
             "args": "benchDB",
-            "vmArgs": "--add-modules=jdk.incubator.vector -Djava.util.logging.config.file=core-patch/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.core.config.file=core-patch/target/classes/org/vanilladb/core/vanilladb.properties"
+            "vmArgs": "--add-modules=jdk.incubator.vector -XX:-UseSuperWord -Djava.util.logging.config.file=core-patch/target/classes/java/util/logging/logging.properties -Dorg.vanilladb.core.config.file=core-patch/target/classes/org/vanilladb/core/vanilladb.properties"
         },
         {
             "type": "java",
