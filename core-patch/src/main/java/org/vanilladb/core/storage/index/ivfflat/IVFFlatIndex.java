@@ -413,37 +413,17 @@ public class IVFFlatIndex extends Index {
 	 * @return the 
 	 */
 	private int findCentroid(VectorConstant queryVector) {
-		/*
 		int bestCentroid = 0;
 		double bestDistance = Double.POSITIVE_INFINITY;
 		DistanceFn distFn = getDistFn(queryVector);
 		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
 			double currentDistance = distFn.distance(centroids[centroidIndex]);
-			if (currentDistance < bestDistance) 
+			if (currentDistance < bestDistance) {
 				bestCentroid = centroidIndex;
 				bestDistance = currentDistance;
-		}
-		return bestCentroid;
-		*/
-		int bestCentroid = 0;
-		float bestDistance = Float.MAX_VALUE;
-		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
-			float distance = computeDistance(queryVector, centroids[centroidIndex]);
-			if (distance < bestDistance) {
-				bestCentroid = centroidIndex;
-				bestDistance = distance;
 			}
 		}
 		return bestCentroid;
-	}
-
-	private float computeDistance(VectorConstant v1, VectorConstant v2) {
-		float distance = 0;
-		VectorConstant subtractedVector = (VectorConstant) v1.sub(v2);
-		for (int i = 0; i < subtractedVector.dimension(); ++i) {
-			distance += subtractedVector.get(i) * subtractedVector.get(i);
-		}
-		return (float) Math.sqrt(distance);
 	}
 
 	/**
