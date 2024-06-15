@@ -144,9 +144,9 @@ public class StoredProcedureUtils {
 		return VanillaDb.newPlanner().executeInsert(sql, tx);
 	}
 
-	public static void executeTrainIndex(String tblName, List<String> idxFields, String idxName, Transaction tx) {
+	public static void executeTrainIndex(String tblName, List<String> idxFields, String idxName, int limit, Transaction tx) {
         IndexInfo indexInfo = VanillaDb.catalogMgr().getIndexInfoByName(idxName, tx);
         Index index = indexInfo.open(tx);
-        index.buildIndex();
+        index.buildIndex(limit);
     }
 }

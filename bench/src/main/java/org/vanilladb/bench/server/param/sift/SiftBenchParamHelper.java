@@ -1,6 +1,7 @@
 package org.vanilladb.bench.server.param.sift;
 
 import java.util.Set;
+import java.util.ArrayList;
 
 import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.Schema;
@@ -17,6 +18,9 @@ public class SiftBenchParamHelper implements StoredProcedureHelper {
     private Integer[] items;
     private int numNeighbors = 20; // Number of top-k
 
+    private int insertCount = 0;
+    private ArrayList<Object[]> insertHistory  = new ArrayList<>();
+
     @Override
     public void prepareParameters(Object... pars) {
         numDimension = (Integer) pars[0];
@@ -26,6 +30,19 @@ public class SiftBenchParamHelper implements StoredProcedureHelper {
         }
         query = new VectorConstant(rawVector);
         items = new Integer[numNeighbors];
+
+        if (pars.length > numDimension+1){
+            insertCount = (Integer) pars[numDimension+1];
+            int ptr = numDimension + 2;
+            for (int i = 0; i < insertCount; i++){
+                Object[] insertParam = new Object[numDimension + 1];
+                for (int j = 0; j < numDimension + 1; j++) {
+                    insertParam[j] = pars[ptr + j + 1];
+                }
+                insertHistory.add(insertParam);
+                ptr = ptr + numDimension + 2;
+            }
+        }
     }
 
     @Override
@@ -51,7 +68,7 @@ public class SiftBenchParamHelper implements StoredProcedureHelper {
 
     @Override
     public boolean isReadOnly() {
-        return true;
+        return false;
     }
 
     public void setNearestNeighbors(Set<Integer> nearestNeighbors) {
@@ -72,5 +89,13 @@ public class SiftBenchParamHelper implements StoredProcedureHelper {
 
     public int getK() {
         return numNeighbors;
+    }
+
+    public int getInsertCount(){
+        return insertCount;
+    }
+
+    public ArrayList<Object[]> getInsertHistory() {
+        return insertHistory;
     }
 }
