@@ -1,0 +1,189 @@
+package org.vanilladb.core.storage.index.ivfflat;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+
+import org.vanilladb.core.server.VanillaDb;
+import org.vanilladb.core.sql.Constant;
+import org.vanilladb.core.sql.DoubleConstant;
+import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.sql.VectorConstant;
+import org.vanilladb.core.storage.file.BlockId;
+import org.vanilladb.core.storage.index.SearchKey;
+import org.vanilladb.core.util.CoreProperties;
+
+public class ProductQuantizationMgr {
+    // Hyperparameters
+    private static final int NUM_SUBSPACES;
+	private static final int NUM_CLUSTERS_PER_SUBSPACE;
+	private static final int NUM_DIMENSION;
+
+    private int NUM_SUBSPACE_DIMENSION; // Dimensionality of each subspace
+    private float[][][] codebooks; // Codebooks for each subspace
+    private int[][] encodedVectors; // Encoded vectors
+
+    static {
+		NUM_SUBSPACES = CoreProperties.getLoader().getPropertyAsInteger(
+				ProductQuantizationMgr.class.getName() + ".NUM_SUBSPACES", 4
+		);
+		NUM_CLUSTERS_PER_SUBSPACE = CoreProperties.getLoader().getPropertyAsInteger(
+			ProductQuantizationMgr.class.getName() + ".NUM_CLUSTERS_PER_SUBSPACE", 200
+		);
+		NUM_DIMENSION = CoreProperties.getLoader().getPropertyAsInteger(
+			ProductQuantizationMgr.class.getName() + ".NUM_DIMENSION", 128
+		);
+	}
+
+    public ProductQuantizationMgr() {
+        System.err.println("pqMgr initialized.");
+        this.NUM_SUBSPACE_DIMENSION = NUM_DIMENSION / NUM_SUBSPACES;
+        this.codebooks = new float[NUM_SUBSPACES][NUM_CLUSTERS_PER_SUBSPACE][NUM_SUBSPACE_DIMENSION];
+    }
+
+    // Split the vector into NUM_SUBSPACES subspaces
+    private float[][] splitIntoSubspaces(VectorConstant vector) {
+        float[] vector_vals = vector.asJavaVal();
+        float[][] subspaces = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
+        for (int m = 0; m < NUM_SUBSPACES; m++) {
+            System.arraycopy(vector_vals, m * NUM_SUBSPACE_DIMENSION, subspaces[m], 0, NUM_SUBSPACE_DIMENSION);
+        }
+        return subspaces;
+    }
+
+    // Compute the distance of two input VectorConstants
+    private float computeDistance(VectorConstant v1, VectorConstant v2) {
+		float distance = 0;
+		VectorConstant subtractedVector = (VectorConstant) v1.sub(v2);
+		for (int i = 0; i < subtractedVector.dimension(); ++i) {
+			distance += subtractedVector.get(i) * subtractedVector.get(i);
+		}
+		return (float) Math.sqrt(distance);
+	}
+
+    // Train the codebooks using k-means clustering
+    public void train(ArrayList<VectorConstant> vectors) {
+        Random rand = new Random();
+        for (int m = 0; m < NUM_SUBSPACES; m++) {
+            float[][] subspaceData = new float[vectors.size()][NUM_SUBSPACE_DIMENSION];
+            for (int i = 0; i < vectors.size(); i++) {
+                subspaceData[i] = splitIntoSubspaces(vectors.get(i))[m];
+            }
+            // NUM_CLUSTERS_PER_SUBSPACE-means clustering (simplified)
+            for (int k = 0; k < NUM_CLUSTERS_PER_SUBSPACE; k++) {
+                codebooks[m][k] = subspaceData[rand.nextInt(subspaceData.length)];
+            }
+            boolean changed;
+            do {
+                int[] labels = new int[subspaceData.length];
+                for (int i = 0; i < subspaceData.length; i++) {
+                    labels[i] = findNearestCluster(codebooks[m], subspaceData[i]);
+                }
+                float[][] newCenters = new float[NUM_CLUSTERS_PER_SUBSPACE][NUM_SUBSPACE_DIMENSION];
+                int[] counts = new int[NUM_CLUSTERS_PER_SUBSPACE];
+                for (int i = 0; i < subspaceData.length; i++) {
+                    int label = labels[i];
+                    for (int d = 0; d < NUM_SUBSPACE_DIMENSION; d++) {
+                        newCenters[label][d] += subspaceData[i][d];
+                    }
+                    counts[label]++;
+                }
+                changed = false;
+                for (int k = 0; k < NUM_CLUSTERS_PER_SUBSPACE; k++) {
+                    if (counts[k] > 0) {
+                        for (int d = 0; d < NUM_SUBSPACE_DIMENSION; d++) {
+                            newCenters[k][d] /= counts[k];
+                        }
+                        if (!Arrays.equals(codebooks[m][k], newCenters[k])) {
+                            changed = true;
+                            codebooks[m][k] = newCenters[k];
+                        }
+                    }
+                }
+            } while (changed);
+        }
+    }
+
+    // Find the nearest cluster center
+    private int findNearestCluster(float[][] codebook, float[] vector) {
+        int nearest = -1;
+        double minDist = Float.MAX_VALUE;
+        for (int k = 0; k < codebook.length; k++) {
+            double dist = distance(codebook[k], vector);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = k;
+            }
+        }
+        return nearest;
+    }
+
+    // Euclidean distance
+    private double distance(float[] a, float[] b) {
+        float sum = 0;
+        for (int i = 0; i < a.length; i++) {
+            sum += Math.pow(a[i] - b[i], 2);
+        }
+        return Math.sqrt(sum);
+    }
+
+    // Encode vectors using the trained codebooks
+    public void encodeVectors(ArrayList<VectorConstant> vectors) {
+        encodedVectors = new int[vectors.size()][NUM_SUBSPACES];
+        for (int i = 0; i < vectors.size(); i++) {
+            float[][] subspaces = splitIntoSubspaces(vectors.get(i));
+            for (int m = 0; m < NUM_SUBSPACES; m++) {
+                encodedVectors[i][m] = findNearestCluster(codebooks[m], subspaces[m]);
+            }
+        }
+    }
+
+    // Encode vectors using the trained codebooks
+    public VectorConstant encodeVector(VectorConstant vector) {
+        int[] labels = new int[NUM_SUBSPACES];
+        float[][] subspaces = splitIntoSubspaces(vector);
+        for (int m = 0; m < NUM_SUBSPACES; m++) {
+            labels[m] = findNearestCluster(codebooks[m], subspaces[m]);
+        }
+
+        return new VectorConstant(labels);
+    }
+
+    public SearchKey getSearchKey(VectorConstant encodedVectors){
+        int[] pqKeys = encodedVectors.getCentroidLabels();
+        float[][] vals = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
+        for(int m=0; m < NUM_SUBSPACES; m++){
+             vals[m] = codebooks[m][pqKeys[m]]; 
+        }
+
+        Constant[] vector = new Constant[NUM_DIMENSION];
+        int index = 0;
+        for(int i=0; i<NUM_SUBSPACES; i++)
+            for(int j=0; j<NUM_SUBSPACE_DIMENSION; j++){
+                vector[index] = new DoubleConstant(vals[i][j]);
+            }
+
+        return new SearchKey(vector);
+    }
+
+
+    // Search for the nearest neighbor
+    public int search(VectorConstant query) {
+        float minDist = Float.MAX_VALUE;
+        int nearestIndex = -1;
+        float[][] querySubspaces = splitIntoSubspaces(query);
+        for (int i = 0; i < encodedVectors.length; i++) {
+            float dist = 0;
+            for (int m = 0; m < NUM_SUBSPACES; m++) {
+                dist += distance(codebooks[m][encodedVectors[i][m]], querySubspaces[m]);
+            }
+            if (dist < minDist) {
+                minDist = dist;
+                nearestIndex = i;
+            }
+        }
+        return nearestIndex;
+    }
+    
+}

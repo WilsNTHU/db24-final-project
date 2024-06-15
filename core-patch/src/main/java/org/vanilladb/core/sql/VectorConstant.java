@@ -14,6 +14,7 @@ import java.util.*;
  */
 public class VectorConstant extends Constant implements Serializable {
     private float[] vec;
+    private int[] labels;
     private Type type;
 
     public static VectorConstant zeros(int dimension) {
@@ -52,6 +53,15 @@ public class VectorConstant extends Constant implements Serializable {
         
         for (int i = 0; i < vector.length; i++) {
             vec[i] = vector[i];
+        }
+    }
+
+    public VectorConstant(int[] vector) {
+        type = new VectorType(vector.length);
+        labels = new int[vector.length];
+        
+        for (int i = 0; i < vector.length; i++) {
+            labels[i] = vector[i];
         }
     }
 
@@ -117,6 +127,10 @@ public class VectorConstant extends Constant implements Serializable {
     @Override
     public float[] asJavaVal() {
         return vec;
+    }
+
+    public int[] getCentroidLabels(){
+        return labels;
     }
 
     /**

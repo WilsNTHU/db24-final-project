@@ -174,6 +174,51 @@ public class IVFFlatIndex extends Index {
 		centroids = centroidsList.toArray(new VectorConstant[numCentroids]);
 	}	
 
+	public void encodeSiftTable(){
+		// Preload sift table into memory
+		String tblName = "sift";
+		// long size = fileSize(tblName);
+		// BlockId blk;
+		// for (int j = 0; j < size; j++) {
+		// 	blk = new BlockId(tblName, j);
+		// 	tx.bufferMgr().pin(blk);
+		// }
+
+		System.out.println("Start reading sift.tbl");
+		ArrayList<Constant> iids = new ArrayList<>();
+		ArrayList<VectorConstant> vectors = new ArrayList<>();
+		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		Schema sift_sch = ti.schema();
+		rf = ti.open(tx, false);
+		rf.beforeFirst();
+		while(rf.next()) {
+			VectorConstant vector = (VectorConstant)rf.getVal("i_emb");
+			vectors.add(VanillaDb.pqMgr().encodeVector(vector));
+			iids.add(rf.getVal("i_id"));
+		}
+        rf.close();
+
+		System.out.println("Start encoding sift.tbl");
+		VanillaDb.pqMgr().train(vectors);
+		int index = 0;
+		tblName = "sift_pq";
+		ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		if (ti == null) {
+			VanillaDb.catalogMgr().createTable(tblName, sift_sch, tx);
+			ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		}
+		rf = ti.open(tx, false);
+		rf.beforeFirst();
+		while(rf.next()) {
+			rf.insert();
+			rf.setVal("i_id", iids.get(index));
+			rf.setVal("i_emb", iids.get(index));
+			index++;
+		}
+        rf.close();
+		System.out.println("Encoding sift.tbl success.");
+	}
+
 	public void buildIndex() {
 		isBuilding = true;
 		System.out.println("Built index based on IndexInfo: " + ii);

@@ -167,4 +167,11 @@ public abstract class Index {
 	public void buildIndex() {
 
 	}
+
+	/**
+	 * Encode the sift.tbl (if necessary)
+	 */
+	public void encodeSiftTable(){
+
+	}
 }
