@@ -260,4 +260,12 @@ public class VectorConstant extends Constant implements Serializable {
         }
         return hashCodes;
     }
+
+    public VectorConstant slice(int start, int end) {
+        if (start < 0 || end > vec.length || start > end) {
+            throw new IllegalArgumentException("Invalid slice indices");
+        }
+        float[] slice = Arrays.copyOfRange(vec, start, end);
+        return new VectorConstant(slice);
+    }
 }
