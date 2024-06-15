@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.vanilladb.bench.StatisticMgr;
 import org.vanilladb.bench.benchmarks.sift.SiftBenchConstants;
@@ -28,8 +27,6 @@ public class SiftRte extends RemoteTerminalEmulator<SiftTransactionType> {
     private static final int precision = 100;
 
     static Map<VectorConstant, Set<Integer>> resultMap = new ConcurrentHashMap<>();
-    static Map<VectorConstant, Integer> insertMap = new ConcurrentHashMap<>();
-    static CopyOnWriteArrayList<Object[]> insertHistory = new CopyOnWriteArrayList<>();
 
     public SiftRte(SutConnection conn, StatisticMgr statMgr, long sleepTime) {
         super(conn, statMgr, sleepTime);
@@ -62,43 +59,26 @@ public class SiftRte extends RemoteTerminalEmulator<SiftTransactionType> {
                 paramGen = new SiftParamGen();
                 break;
         }
-        executor = new SiftTxExecutor(paramGen, resultMap, insertMap, insertHistory);
+        executor = new SiftTxExecutor(paramGen, resultMap);
         return executor;
     }
 
     public void executeCalculateRecall(SutConnection conn) throws SQLException {
         List<Double> recallList = new ArrayList<>();
-        List<Map.Entry<VectorConstant, Integer>> insertMapList = new ArrayList<>(insertMap.entrySet());
-        insertMapList.sort(Map.Entry.comparingByValue());
 
-        // System.out.println("insertHistory: ");
-        // for (Object[] array : insertHistory) {
-        //     for (Object obj : array) {
-        //         System.out.print(obj + " ");
-        //     }
-        //     System.out.println();
-        // }
-        // System.out.println("==========");
-
-        for (Map.Entry<VectorConstant, Integer> entry : insertMapList) {
+        // iterate over resultMap
+        for (Map.Entry<VectorConstant, Set<Integer>> entry : resultMap.entrySet()) {
             VectorConstant query = entry.getKey();
-            int insertCount = entry.getValue();
-            Set<Integer> approximateNeighbors = resultMap.get(query);
+            Set<Integer> approximateNeighbors = entry.getValue();
 
             ArrayList<Object> paramList = new ArrayList<>();
+            // =====================
+            // Generating Parameters
+            // =====================
             paramList.add(SiftBenchConstants.NUM_DIMENSION);
             for (int i = 0; i < SiftBenchConstants.NUM_DIMENSION; i++) {
                 paramList.add(query.get(i));
             }
-            paramList.add(insertCount);
-            for (int i = 0; i < insertCount; i++) {
-                Object[] insertParam = insertHistory.get(i);
-                for (Object obj : insertParam) {
-                    paramList.add(obj);
-                }
-            }
-
-            // System.out.println("paramList: " + paramList);
 
             VanillaDbSpResultSet recallResultSet = (VanillaDbSpResultSet) conn.callStoredProc(SiftTransactionType.CALCULATE_RECALL.getProcedureId(), paramList.toArray());
             Schema sch = recallResultSet.getSchema();
@@ -127,8 +107,6 @@ public class SiftRte extends RemoteTerminalEmulator<SiftTransactionType> {
         double averageRecallRate = sum / recallList.size();
 
         statMgr.setRecall(averageRecallRate);
-
-        System.out.println("Average Recall Rate: " + averageRecallRate);
     }
     
 }

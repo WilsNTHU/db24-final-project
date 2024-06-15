@@ -3,7 +3,6 @@ package org.vanilladb.bench.benchmarks.sift.rte;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.vanilladb.bench.TxnResultSet;
 import org.vanilladb.bench.VanillaBenchParameters;
@@ -20,15 +19,11 @@ import org.vanilladb.core.sql.VectorConstant;
 public class SiftTxExecutor extends TransactionExecutor<SiftTransactionType> {
 
     private Map<VectorConstant, Set<Integer>> resultMap;
-    private Map<VectorConstant, Integer> insertMap;
-    private CopyOnWriteArrayList<Object[]> insertHistory;
     private boolean isWarmingUp = false;
 
-    public SiftTxExecutor(TxParamGenerator<SiftTransactionType> pg, Map<VectorConstant, Set<Integer>> resultMap, Map<VectorConstant, Integer> insertMap, CopyOnWriteArrayList<Object[]> insertHistory) {
+    public SiftTxExecutor(TxParamGenerator<SiftTransactionType> pg, Map<VectorConstant, Set<Integer>> resultMap) {
         this.pg = pg;
         this.resultMap = resultMap;
-        this.insertMap = insertMap;
-        this.insertHistory = insertHistory;
     }
 
     public void setWarmingUp(boolean isWarmingUp) {
@@ -44,19 +39,7 @@ public class SiftTxExecutor extends TransactionExecutor<SiftTransactionType> {
 
             long txnRT = System.nanoTime();
 
-            
-            
-
             VanillaDbSpResultSet result = (VanillaDbSpResultSet) executeTxn(conn, params);
-            
-            if (pg.getTxnType() == SiftTransactionType.ANN && !isWarmingUp){
-                insertMap.put(query, insertHistory.size());
-            }
-
-            if (pg.getTxnType() == SiftTransactionType.INSERT && !isWarmingUp){
-                // params: [dim, new_emb, id]
-                insertHistory.add(params);
-            }
 
             // measure response time
             long txnEndTime = System.nanoTime();
@@ -77,10 +60,8 @@ public class SiftTxExecutor extends TransactionExecutor<SiftTransactionType> {
                 approximateNeighbors.add((Integer) rec.getVal(fld).asJavaVal());
             }
 
-            if (pg.getTxnType() == SiftTransactionType.ANN && !isWarmingUp){
+            if (pg.getTxnType() == SiftTransactionType.ANN && !isWarmingUp)
                 resultMap.put(query, approximateNeighbors);
-            }
-            
             return new TxnResultSet(pg.getTxnType(), txnRT, txnEndTime, result.isCommitted(), result.outputMsg());
         } catch (Exception e) {
             e.printStackTrace();
