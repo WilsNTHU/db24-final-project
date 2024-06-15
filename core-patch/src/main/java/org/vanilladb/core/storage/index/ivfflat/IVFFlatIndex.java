@@ -238,6 +238,7 @@ public class IVFFlatIndex extends Index {
 			centroidRecordFile.insert();
 			centroidRecordFile.setVal(SCHEMA_CENTROID, centroids[centroidId]);
 		}
+		centroidRecordFile.close();
 		// Assign each record to the nearest centroid
 		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
 			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
