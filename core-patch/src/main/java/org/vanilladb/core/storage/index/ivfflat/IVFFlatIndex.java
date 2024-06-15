@@ -10,6 +10,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Vector;
+
+import javax.management.RuntimeErrorException;
+
 import java.lang.Math;
 
 import org.vanilladb.core.server.VanillaDb;
@@ -50,12 +53,13 @@ public class IVFFlatIndex extends Index {
 	 * A field name of the schema of index records/
 	 */
 	private static final String SCHEMA_KEY = "key", SCHEMA_RID_BLOCK = "block",
-			SCHEMA_RID_ID = "id";
+			SCHEMA_RID_ID = "id", SCHEMA_CENTROID = "centroid";
 	// Hyperparameters
 	public static final int NUM_CENTROIDS;
 	public static final int NUM_SAMPLES_PER_CENTROIDS;
 	public static final int NUM_ITERATIONS;
 	public static final int BEAM_SIZE;
+	public static final int CENTROID_DIMENSION;
 	// Distance function
 	private static final Class<?> DIST_FN_CLS; 
 
@@ -74,6 +78,9 @@ public class IVFFlatIndex extends Index {
 		);
 		BEAM_SIZE = CoreProperties.getLoader().getPropertyAsInteger(
 			IVFFlatIndex.class.getName() + ".BEAM_SIZE", 1
+		);
+		CENTROID_DIMENSION = CoreProperties.getLoader().getPropertyAsInteger(
+			IVFFlatIndex.class.getName() + ".CENTROID_DIMENSION",128
 		);
 		DIST_FN_CLS = CoreProperties.getLoader().getPropertyAsClass(
 			IVFFlatIndex.class.getName() + ".DIST_FN_CLS", EuclideanFn.class,
@@ -105,9 +112,16 @@ public class IVFFlatIndex extends Index {
 		return sch;
 	}
 
+	private static Schema centroidSchema() {
+		Schema sch = new Schema();
+		sch.addField(SCHEMA_CENTROID, Type.VECTOR(CENTROID_DIMENSION));
+		return sch;
+	}
+
 	private int currentCentroid;
 	private RecordFile rf;
 	private boolean isBeforeFirsted;
+	private boolean isBuilding = false;
 
 	/**
 	 * Opens a IVF-Flat index for the specified index.
@@ -143,7 +157,25 @@ public class IVFFlatIndex extends Index {
 		}
     }
 
+	private void loadCentroidsToMemory() {
+		List<VectorConstant> centroidsList = new ArrayList<VectorConstant>();
+		// Materialize each calculated centroid
+		String centroidTableName = ii.indexName() + "centroid";
+		TableInfo centroidTableInfo = VanillaDb.catalogMgr().getTableInfo(centroidTableName, tx);
+		if (centroidTableInfo == null) 
+			throw new RuntimeException();
+		RecordFile centroidRecordFile = centroidTableInfo.open(tx, false);
+		centroidRecordFile.beforeFirst();
+		while(centroidRecordFile.next()) {
+			centroidsList.add((VectorConstant) centroidRecordFile.getVal(SCHEMA_CENTROID));
+		}
+		centroidRecordFile.close();
+		numCentroids = centroidsList.size();
+		centroids = centroidsList.toArray(new VectorConstant[numCentroids]);
+	}	
+
 	public void buildIndex() {
+		isBuilding = true;
 		System.out.println("Built index based on IndexInfo: " + ii);
 		String tblName = ii.tableName();
 		List<String> fldList = ii.fieldNames();
@@ -172,8 +204,6 @@ public class IVFFlatIndex extends Index {
 		// Centroids are initialized from existing vectors
 		centroids = samples.subList(0, numCentroids).toArray(new VectorConstant[numCentroids]);
 		System.out.println("There are " + totalSamples + " samples.");
-		for (int it = 0; it < numCentroids; ++it) {
-		}
 		// Adjust centroids through iterations
 		for (int it = 0; it < NUM_ITERATIONS; ++it) {
 			// Initialize clusters and distance functions
@@ -196,6 +226,18 @@ public class IVFFlatIndex extends Index {
 				centroids[centroidIndex] = meanCentroid;
 			}
 		}
+		// Materialize each calculated centroid
+		String centroidTableName = ii.indexName() + "centroid";
+		TableInfo centroidTableInfo = VanillaDb.catalogMgr().getTableInfo(centroidTableName, tx);
+		if (centroidTableInfo == null) {
+			VanillaDb.catalogMgr().createTable(centroidTableName, centroidSchema(), tx);
+			centroidTableInfo = VanillaDb.catalogMgr().getTableInfo(centroidTableName, tx);
+		}
+		RecordFile centroidRecordFile = centroidTableInfo.open(tx, false);
+		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
+			centroidRecordFile.insert();
+			centroidRecordFile.setVal(SCHEMA_CENTROID, centroids[centroidId]);
+		}
 		// Assign each record to the nearest centroid
 		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
 			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
@@ -208,6 +250,7 @@ public class IVFFlatIndex extends Index {
 				++cnt;
 			System.out.println("Centroid " + centroidId + " has " + cnt + "entries");
 		}
+		isBuilding = false;
 	}
 
     /**
@@ -222,6 +265,8 @@ public class IVFFlatIndex extends Index {
     @Override
 	public void beforeFirst(SearchRange searchRange) {
 		close();
+		if (!isBuilding && centroids == null)
+			loadCentroidsToMemory();
 		if (!searchRange.isSingleValue())
 			throw new UnsupportedOperationException();
 		currentCentroid = processSearchRange(searchRange);

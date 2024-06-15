@@ -51,7 +51,7 @@ public class HeuristicQueryPlanner implements QueryPlanner {
 			if (viewdef != null)
 				views.add(VanillaDb.newPlanner().createQueryPlan(viewdef, tx));
 			else {
-				TablePlanner tp = new TablePlanner(tbl, data.pred(), data.embeddingFields(), tx, id);
+				TablePlanner tp = new TablePlanner(tbl, data.pred(), data.embeddingFields(), data.limit(), data.projectFields(), tx, id);
 				tablePlanners.add(tp);
 			}
 			id += 1;
@@ -77,12 +77,14 @@ public class HeuristicQueryPlanner implements QueryPlanner {
 			trunk = new SortPlan(trunk, data.sortFields(),
 					data.sortDirections(), tx);
 
+		// Optimization: Fuse projection on field names with TablePlanner
 		// Step 6. Project on the field names
-		trunk = new ProjectPlan(trunk, data.projectFields());
+		// trunk = new ProjectPlan(trunk, data.projectFields());
 
+		// Optimization: Fuse limit with TablePlanner
 		// Step 7: Add a limit plan if specified
-		if (data.limit() != -1)
-			trunk = new LimitPlan(trunk, data.limit());
+		// if (data.limit() != -1)
+		//	trunk = new LimitPlan(trunk, data.limit());
 			
 		// Step 8: Add a explain plan if the query is explain statement
 		if (data.isExplain())

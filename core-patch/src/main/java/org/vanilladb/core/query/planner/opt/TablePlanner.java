@@ -42,6 +42,8 @@ class TablePlanner {
 	private String tblName;
 	private TablePlan tp;
 	private Predicate pred;
+	private int limit;
+	private Set<String> projectFields;
 	private Schema sch;
 	private Transaction tx;
 	private int id;
@@ -89,6 +91,27 @@ class TablePlanner {
 			}
 		}
 	}
+
+	public TablePlanner(String tblName, Predicate pred, List<DistanceFn> embFields, int limit,
+			Set<String> projectFields, Transaction tx, int id) {
+		this.tblName = tblName;
+		this.pred = pred;
+		this.limit = limit;
+		this.tx = tx;
+		this.id = id;
+		this.projectFields = projectFields;
+		this.hashCode = (int) Math.pow(2, id);
+		tp = new TablePlan(tblName, tx);
+		sch = tp.schema();
+
+		// Two tables cannot have the same embedding field names
+		for (DistanceFn embField : embFields) {
+			if (sch.hasField(embField.fieldName())) {
+				this.embField = embField;
+				break;
+			}
+		}
+	}
 	
 	/**
 	 * An unique number to this planner.
@@ -119,7 +142,7 @@ class TablePlanner {
 			p = tp;
 		p =  addSelectPredicate(p);
 		if (embField != null) {
-			p = new NearestNeighborPlan(p, embField, tx);
+			p = new NearestNeighborPlan(p, embField, limit, projectFields, tx);
 		}
 		return p;
 	}

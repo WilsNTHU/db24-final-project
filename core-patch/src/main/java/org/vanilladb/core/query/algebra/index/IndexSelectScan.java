@@ -77,7 +77,6 @@ public class IndexSelectScan implements UpdateScan {
 		if (ok) {
 			RecordId rid = idx.getDataRecordId();
 			ts.moveToRecordId(rid);
-			System.out.println(Thread.currentThread().getName() + ": " + ++count);
 		}
 		return ok;
 	}
@@ -89,7 +88,6 @@ public class IndexSelectScan implements UpdateScan {
 	 */
 	@Override
 	public void close() {
-		System.out.println("IndexSelectScan on " + " " + count);
 		idx.close();
 		ts.close();
 	}
