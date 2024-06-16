@@ -1,7 +1,3 @@
-# Warning
-Due to the file size of sift.txt, we can't not put it here
-download from our drive:[here](https://drive.google.com/file/d/1B2jRyOnfyTfMS4Pyomh9MD-lv5PO80tX/view?usp=sharing)
-and put it in root of this project(db24-final-project/)
 # Final Project
 
 Can you extend a relational database system to support storing and querying over vectors?
