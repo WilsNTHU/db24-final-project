@@ -118,6 +118,13 @@ public class IVFFlatIndex extends Index {
 		return sch;
 	}
 
+	private static Schema encodedSiftSchema() {
+		Schema sch = new Schema();
+		sch.addField("i_id", INTEGER);
+		sch.addField("i_emb", Type.VECTOR(ProductQuantizationMgr.NUM_SUBSPACES));
+		return sch;
+	}
+
 	private int currentCentroid;
 	private RecordFile rf;
 	private boolean isBeforeFirsted;
@@ -188,7 +195,6 @@ public class IVFFlatIndex extends Index {
 		ArrayList<Constant> iids = new ArrayList<>();
 		ArrayList<VectorConstant> vectors = new ArrayList<>();
 		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
-		Schema sift_sch = ti.schema();
 		rf = ti.open(tx, false);
 		rf.beforeFirst();
 		while(rf.next()) {
@@ -203,7 +209,7 @@ public class IVFFlatIndex extends Index {
 		tblName = "sift_pq";
 		ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
 		if (ti == null) {
-			VanillaDb.catalogMgr().createTable(tblName, sift_sch, tx);
+			VanillaDb.catalogMgr().createTable(tblName, encodedSiftSchema(), tx);
 			ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
 		}
 		System.out.println("Start building sift_pq.tbl");

@@ -16,9 +16,10 @@ import org.vanilladb.core.util.CoreProperties;
 
 public class ProductQuantizationMgr {
     // Hyperparameters
-    private static final int NUM_SUBSPACES;
-	private static final int NUM_CLUSTERS_PER_SUBSPACE;
-	private static final int NUM_DIMENSION;
+    public static final int NUM_SUBSPACES;
+	public static final int NUM_CLUSTERS_PER_SUBSPACE;
+	public static final int NUM_DIMENSION;
+    public static boolean isCodeBooksGenerated;
 
     private int NUM_SUBSPACE_DIMENSION; // Dimensionality of each subspace
     private float[][][] codebooks; // Codebooks for each subspace
@@ -40,6 +41,7 @@ public class ProductQuantizationMgr {
         System.err.println("pqMgr initialized.");
         this.NUM_SUBSPACE_DIMENSION = NUM_DIMENSION / NUM_SUBSPACES;
         this.codebooks = new float[NUM_SUBSPACES][NUM_CLUSTERS_PER_SUBSPACE][NUM_SUBSPACE_DIMENSION];
+        this.isCodeBooksGenerated = false;
     }
 
     // Split the vector into NUM_SUBSPACES subspaces
@@ -104,6 +106,8 @@ public class ProductQuantizationMgr {
                 }
             } while (changed);
         }
+
+        isCodeBooksGenerated = true;
     }
 
     // Find the nearest cluster center
@@ -151,21 +155,21 @@ public class ProductQuantizationMgr {
         return new VectorConstant(labels);
     }
 
-    public SearchKey getSearchKey(VectorConstant encodedVectors){
+    public VectorConstant getDecodedVector(VectorConstant encodedVectors){
         float[] pqKeys = encodedVectors.asJavaVal();
         float[][] vals = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
         for(int m=0; m < NUM_SUBSPACES; m++){
              vals[m] = codebooks[m][(int) pqKeys[m]]; 
         }
 
-        Constant[] vector = new Constant[NUM_DIMENSION];
+        float[] vector = new float[NUM_DIMENSION];
         int index = 0;
         for(int i=0; i<NUM_SUBSPACES; i++)
             for(int j=0; j<NUM_SUBSPACE_DIMENSION; j++){
-                vector[index] = new DoubleConstant(vals[i][j]);
+                vector[index] = vals[i][j];
             }
 
-        return new SearchKey(vector);
+        return new VectorConstant(vector);
     }
 
 

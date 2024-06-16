@@ -21,6 +21,7 @@ import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.Record;
 import org.vanilladb.core.sql.SchemaIncompatibleException;
 import org.vanilladb.core.sql.Type;
+import org.vanilladb.core.sql.VectorConstant;
 import org.vanilladb.core.storage.buffer.Buffer;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.file.Page;
@@ -152,6 +153,8 @@ public class RecordFile implements Record {
 	 * @return the value at that field
 	 */
 	public Constant getVal(String fldName) {
+		if(fileName=="sift_pq.tbl" && fldName=="i_emb")
+			return VanillaDb.pqMgr().getDecodedVector((VectorConstant) rp.getVal(fldName));
 		return rp.getVal(fldName);
 	}
 
@@ -172,6 +175,8 @@ public class RecordFile implements Record {
 		Constant v = val.castTo(fldType);
 		if (Page.size(v) > Page.maxSize(fldType))
 			throw new SchemaIncompatibleException();
+		if(fileName=="sift_pq.tbl" && fldName=="i_emb")
+			v = VanillaDb.pqMgr().encodeVector((VectorConstant) v);
 		rp.setVal(fldName, v);
 	}
 

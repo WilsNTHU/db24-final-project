@@ -31,6 +31,7 @@ import org.vanilladb.core.sql.IntegerConstant;
 import org.vanilladb.core.sql.Schema;
 import org.vanilladb.core.sql.Type;
 import org.vanilladb.core.sql.VarcharConstant;
+import org.vanilladb.core.storage.index.ivfflat.ProductQuantizationMgr;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.tx.Transaction;
@@ -213,6 +214,10 @@ public class TableMgr {
 		TableInfo resultTi = tiMap.get(tblName);
 		if (resultTi != null)
 			return resultTi;
+
+		if(tblName=="sift" && ProductQuantizationMgr.isCodeBooksGenerated){
+			resultTi = tiMap.get("sift_pq");
+		}
 
 		RecordFile tcatfile = tcatInfo.open(tx, true);
 		tcatfile.beforeFirst();
