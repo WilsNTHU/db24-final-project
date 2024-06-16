@@ -117,6 +117,14 @@ public class IVFFlatIndex extends Index {
 		return sch;
 	}
 
+
+	private static Schema encodedSiftSchema() {
+		Schema sch = new Schema();
+		sch.addField("i_id", INTEGER);
+		sch.addField("i_emb", Type.VECTOR(ProductQuantizationMgr.NUM_SUBSPACES));
+		return sch;
+  }
+  
 	private class Pair {
 		double key;
 		int value;
@@ -188,6 +196,52 @@ public class IVFFlatIndex extends Index {
 		numCentroids = centroidsList.size();
 		centroids = centroidsList.toArray(new VectorConstant[numCentroids]);
 	}	
+
+	public void encodeSiftTable(){
+		// Preload sift table into memory
+		String tblName = "sift";
+		long size = fileSize(tblName);
+		BlockId blk;
+		for (int j = 0; j < size; j++) {
+			blk = new BlockId(tblName, j);
+			tx.bufferMgr().pin(blk);
+		}
+
+		System.out.println("Start reading sift.tbl");
+		ArrayList<Constant> iids = new ArrayList<>();
+		ArrayList<VectorConstant> vectors = new ArrayList<>();
+		TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		rf = ti.open(tx, false);
+		rf.beforeFirst();
+		while(rf.next()) {
+			vectors.add((VectorConstant)rf.getVal("i_emb"));
+			iids.add(rf.getVal("i_id"));
+		}
+        rf.close();
+
+		System.out.println("Start building codebooks");
+		VanillaDb.pqMgr().train(vectors);
+		int index = 0;
+		tblName = "sift_pq";
+		ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		if (ti == null) {
+			VanillaDb.catalogMgr().createTable(tblName, encodedSiftSchema(), tx);
+			ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+		}
+		System.out.println("Start building sift_pq.tbl");
+		rf = ti.open(tx, false);
+		rf.beforeFirst();
+		for(int i=0; i<vectors.size(); i++){
+			rf.insert();
+			rf.setVal("i_id", iids.get(index));
+			VectorConstant vec = VanillaDb.pqMgr().encodeVector(vectors.get(index));
+			System.out.println(vec);
+			rf.setVal("i_emb", vec);
+			index++;
+		}
+        rf.close();
+		System.out.println("PQ procedure succeeded");
+	}
 
 	public void buildIndex(int limit) {
 		isBuilding = true;
@@ -311,6 +365,19 @@ public class IVFFlatIndex extends Index {
 		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
 			centroidRecordFile.insert();
 			centroidRecordFile.setVal(SCHEMA_CENTROID, centroids[centroidId]);
+		}
+
+		// Assign each record to the nearest centroid
+		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
+			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
+		}
+		// Sanity check
+		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
+			beforeFirst(new SearchRange(new SearchKey(new IntegerConstant(centroidId))));
+			int cnt = 0;
+			while(next())
+				++cnt;
+			System.out.println("Centroid " + centroidId + " has " + cnt + " entries");
 		}
 		centroidRecordFile.close();
 		System.out.println("Number of centroids " + numCentroids);

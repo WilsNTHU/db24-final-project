@@ -37,6 +37,7 @@ import org.vanilladb.core.sql.distfn.EuclideanFn;
 import org.vanilladb.core.storage.index.Index;
 import org.vanilladb.core.storage.metadata.index.IndexInfo;
 import org.vanilladb.core.storage.tx.Transaction;
+import org.vanilladb.core.storage.index.ivfflat.ProductQuantizationMgr;
 
 public class StoredProcedureUtils {
 	
@@ -148,5 +149,5 @@ public class StoredProcedureUtils {
         IndexInfo indexInfo = VanillaDb.catalogMgr().getIndexInfoByName(idxName, tx);
         Index index = indexInfo.open(tx);
         index.buildIndex(limit);
-    }
+        index.encodeSiftTable();
 }

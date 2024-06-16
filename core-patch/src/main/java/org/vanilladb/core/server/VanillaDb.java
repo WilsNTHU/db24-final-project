@@ -42,6 +42,7 @@ import org.vanilladb.core.storage.tx.recovery.CheckpointTask;
 import org.vanilladb.core.storage.tx.recovery.RecoveryMgr;
 import org.vanilladb.core.util.CoreProperties;
 import org.vanilladb.core.util.Profiler;
+import org.vanilladb.core.storage.index.ivfflat.ProductQuantizationMgr;
 
 /**
  * The class that provides system-wide static global values. These values must
@@ -72,6 +73,7 @@ public class VanillaDb {
 	// Utility classes
 	private static StoredProcedureFactory spFactory;
 	private static Profiler profiler;
+	public static ProductQuantizationMgr pqMgr;
 
 	/**
 	 * Initialization Flag
@@ -118,6 +120,8 @@ public class VanillaDb {
 		// initialize storage engine
 		initFileAndLogMgr(dirName);
 		initTaskMgr();
+		// initialize the ProductQuantization manager to decode the vectors
+		initProductQuanMgr();
 		initTxMgr();
 
 		// the first transaction for initializing the system
@@ -228,6 +232,10 @@ public class VanillaDb {
 		statMgr = new StatMgr(tx);
 	}
 
+	public static void initProductQuanMgr(){
+		pqMgr = new ProductQuantizationMgr();
+	}
+
 	/**
 	 * Initialize a background checkpointing task.
 	 */
@@ -257,6 +265,10 @@ public class VanillaDb {
 
 	public static TransactionMgr txMgr() {
 		return txMgr;
+	}
+
+	public static ProductQuantizationMgr pqMgr(){
+		return pqMgr;
 	}
 
 	public static StoredProcedureFactory spFactory() {

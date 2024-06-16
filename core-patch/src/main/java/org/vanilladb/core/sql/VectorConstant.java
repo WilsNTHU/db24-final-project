@@ -55,6 +55,15 @@ public class VectorConstant extends Constant implements Serializable {
         }
     }
 
+    public VectorConstant(int[] vector) {
+        type = new VectorType(vector.length);
+        vec = new float[vector.length];
+        
+        for (int i = 0; i < vector.length; i++) {
+            vec[i] = vector[i];
+        }
+    }
+
     public VectorConstant(List<Float> vector) {
         int length = vector.size();
         
