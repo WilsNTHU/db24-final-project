@@ -215,12 +215,10 @@ public class TableMgr {
 		if (resultTi != null)
 			return resultTi;
 
-		if(!tblName.contains("_pq")){
+		if (!tblName.contains("_pq")) {
 			resultTi = getTableInfo(tblName + "_pq", tx);
-			if(resultTi != null){
-				System.out.println("getTableInfo: sift_pq is found");
-				return resultTi;
-			}
+				if (resultTi != null)
+					return resultTi;
 		}
 
 		RecordFile tcatfile = tcatInfo.open(tx, true);
