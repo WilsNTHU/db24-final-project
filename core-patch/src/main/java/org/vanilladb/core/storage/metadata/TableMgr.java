@@ -215,8 +215,10 @@ public class TableMgr {
 		if (resultTi != null)
 			return resultTi;
 
-		if(tblName=="sift" && ProductQuantizationMgr.isCodeBooksGenerated){
-			resultTi = tiMap.get("sift_pq");
+		if (!tblName.contains("_pq")) {
+			resultTi = getTableInfo(tblName + "_pq", tx);
+				if (resultTi != null)
+					return resultTi;
 		}
 
 		RecordFile tcatfile = tcatInfo.open(tx, true);
