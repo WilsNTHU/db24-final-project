@@ -244,4 +244,7 @@ public class ProductQuantizationMgr {
         return nearestIndex;
     }
 
+    public boolean isCodeBooksGenerated(){
+        return this.codebooks == null;
+    }
 }

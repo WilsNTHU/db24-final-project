@@ -25,6 +25,7 @@ import org.vanilladb.core.sql.VectorConstant;
 import org.vanilladb.core.storage.buffer.Buffer;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.file.Page;
+import org.vanilladb.core.storage.index.ivfflat.ProductQuantizationMgr;
 import org.vanilladb.core.storage.metadata.TableInfo;
 import org.vanilladb.core.storage.tx.Transaction;
 
@@ -153,8 +154,10 @@ public class RecordFile implements Record {
 	 * @return the value at that field
 	 */
 	public Constant getVal(String fldName) {
-		if(ti.fileName()=="sift_pq.tbl" && fldName=="i_emb"){
-			System.out.println("Encoded vectore referenced");
+		System.out.println(ti.fileName());
+		System.out.println(fldName);
+		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb") && VanillaDb.pqMgr().isCodeBooksGenerated()){
+			System.out.println("Encoded vectore getVal()");
 			return VanillaDb.pqMgr().getDecodedVector((VectorConstant) rp.getVal(fldName), tx);
 		}
 			
@@ -178,8 +181,11 @@ public class RecordFile implements Record {
 		Constant v = val.castTo(fldType);
 		if (Page.size(v) > Page.maxSize(fldType))
 			throw new SchemaIncompatibleException();
-		if(ti.fileName()=="sift_pq.tbl" && fldName=="i_emb"){
-			System.out.println("Encoded vectore referenced");
+
+		System.out.println(ti.fileName());
+		System.out.println(fldName);
+		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb") && ProductQuantizationMgr.isCodeBooksGenerated){
+			System.out.println("Encoded vectore setVal()");
 			v = VanillaDb.pqMgr().encodeVector((VectorConstant) v, tx);
 		}
 			
