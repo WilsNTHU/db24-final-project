@@ -435,9 +435,22 @@ public class IVFFlatIndex extends Index {
         if (!isBeforeFirsted)
 			throw new IllegalStateException("You must call beforeFirst() before iterating index '"
 				+ ii.indexName() + "'");
-
 		while (rf.next())
 			return true;
+		// Open next centroid file if 
+		if (!centroidQueue.isEmpty()) {
+			currentCentroid = centroidQueue.poll();
+			// Open corresponding centroid record file
+			String tblName = ii.indexName() + currentCentroid;
+			TableInfo ti = new TableInfo(tblName, schema());
+			this.rf = ti.open(tx, false);
+			// Initialize the file header if needed
+			if (rf.fileSize() == 0)
+				RecordFile.formatFileHeader(ti.fileName(), tx);
+			rf.beforeFirst();
+			while(rf.next())
+				return true;
+		}
 		return false;
     }
 
