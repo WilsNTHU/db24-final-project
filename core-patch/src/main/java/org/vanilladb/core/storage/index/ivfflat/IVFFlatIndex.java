@@ -238,13 +238,13 @@ public class IVFFlatIndex extends Index {
 		rf.beforeFirst();
 		for(int i=0; i<vectors.size(); i++){
 			rf.insert();
-			rf.setVal("i_id", iids.get(index));
-			VectorConstant vec = VanillaDb.pqMgr().encodeVector(vectors.get(index), tx);
-			rf.setVal("i_emb", vec);
-			index++;
+			rf.setVal("i_id", iids.get(i));
+			VectorConstant vec = vectors.get(i);
+			rf.setVal("i_emb", VanillaDb.pqMgr().encodeVector(vec, tx));
 		}
         rf.close();
 		System.out.println("PQ procedure succeeded");
+		ProductQuantizationMgr.isCodeBooksGenerated = true;
 	}
 
 	public void buildIndex(int limit) {

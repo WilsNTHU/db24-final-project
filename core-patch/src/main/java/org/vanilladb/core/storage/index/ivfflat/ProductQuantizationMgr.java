@@ -46,7 +46,7 @@ public class ProductQuantizationMgr {
         System.err.println("pqMgr initialized.");
         this.NUM_SUBSPACE_DIMENSION = NUM_DIMENSION / NUM_SUBSPACES;
         this.codebooks = new float[NUM_SUBSPACES][NUM_CLUSTERS_PER_SUBSPACE][NUM_SUBSPACE_DIMENSION];
-        ProductQuantizationMgr.isCodeBooksGenerated = false;
+        ProductQuantizationMgr.isCodeBooksGenerated = true;
     }
 
 
@@ -74,6 +74,7 @@ public class ProductQuantizationMgr {
 
     // Train the codebooks using k-means clustering
     public void train(ArrayList<VectorConstant> vectors, Transaction tx) {
+        isCodeBooksGenerated = false;
         Random rand = new Random();
         for (int m = 0; m < NUM_SUBSPACES; m++) {
             float[][] subspaceData = new float[vectors.size()][NUM_SUBSPACE_DIMENSION];
@@ -115,12 +116,11 @@ public class ProductQuantizationMgr {
         }
 
         writeCodeBooksToMemory(tx);
-        isCodeBooksGenerated = true;
     }
 
     private void writeCodeBooksToMemory(Transaction tx){
         for(int i=0; i<NUM_SUBSPACES; i++){
-            int index = 0;
+            int index = 1;
             String tblName = "CodeBooks" + i;
             TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
             if (ti == null) {
@@ -141,7 +141,6 @@ public class ProductQuantizationMgr {
 
     private void loadCodeBooksToMemory(Transaction tx){
         for(int i=0; i<NUM_SUBSPACES; i++){
-            int index = 0;
             String tblName = "CodeBooks" + i;
             TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
             RecordFile rf = ti.open(tx, false);
@@ -152,6 +151,7 @@ public class ProductQuantizationMgr {
             }
             rf.close();
         }
+        System.out.println("Load codeBook into memory succeed");
     }
 
     public Schema codeBookSchema(){
@@ -197,7 +197,7 @@ public class ProductQuantizationMgr {
 
     // Encode vectors using the trained codebooks
     public VectorConstant encodeVector(VectorConstant vector, Transaction tx) {
-        if(this.codebooks == null) loadCodeBooksToMemory(tx);
+        if(isCodeBooksGenerated) loadCodeBooksToMemory(tx);
         int[] labels = new int[NUM_SUBSPACES];
         float[][] subspaces = splitIntoSubspaces(vector);
         for (int m = 0; m < NUM_SUBSPACES; m++) {
@@ -208,7 +208,7 @@ public class ProductQuantizationMgr {
     }
 
     public VectorConstant getDecodedVector(VectorConstant encodedVectors, Transaction tx){
-        if(this.codebooks == null) loadCodeBooksToMemory(tx);
+        if(isCodeBooksGenerated) loadCodeBooksToMemory(tx);
         float[] pqKeys = encodedVectors.asJavaVal();
         float[][] vals = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
         for(int m=0; m < NUM_SUBSPACES; m++){
@@ -245,6 +245,6 @@ public class ProductQuantizationMgr {
     }
 
     public boolean isCodeBooksGenerated(){
-        return this.codebooks == null;
+        return isCodeBooksGenerated;
     }
 }

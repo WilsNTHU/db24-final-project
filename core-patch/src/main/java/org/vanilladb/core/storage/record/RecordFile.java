@@ -156,7 +156,8 @@ public class RecordFile implements Record {
 	public Constant getVal(String fldName) {
 		System.out.println(ti.fileName());
 		System.out.println(fldName);
-		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb") && VanillaDb.pqMgr().isCodeBooksGenerated()){
+		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb")
+			&& ProductQuantizationMgr.isCodeBooksGenerated){
 			System.out.println("Encoded vectore getVal()");
 			return VanillaDb.pqMgr().getDecodedVector((VectorConstant) rp.getVal(fldName), tx);
 		}
@@ -184,7 +185,8 @@ public class RecordFile implements Record {
 
 		System.out.println(ti.fileName());
 		System.out.println(fldName);
-		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb") && ProductQuantizationMgr.isCodeBooksGenerated){
+		if(ti.fileName().equals("sift_pq.tbl") && fldName.equals("i_emb")
+			&& ProductQuantizationMgr.isCodeBooksGenerated){
 			System.out.println("Encoded vectore setVal()");
 			v = VanillaDb.pqMgr().encodeVector((VectorConstant) v, tx);
 		}
