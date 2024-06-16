@@ -3,7 +3,6 @@ package org.vanilladb.bench.benchmarks.sift.rte;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 import org.vanilladb.bench.benchmarks.sift.SiftBenchConstants;
@@ -18,33 +17,24 @@ public class SiftParamGen implements TxParamGenerator<SiftTransactionType> {
 
     private VectorConstant query;
 
-    protected static final ArrayList<VectorConstant> queryList = new ArrayList<>();
-
-    static {
-        System.out.println("start loading sift dataset...");
-        int line = 1000000;
-        String vectorString;
-        try (BufferedReader br = new BufferedReader(new FileReader(SiftBenchConstants.DATASET_FILE))) {
-            for (int i = 0; i < line; i++) {
-                vectorString = br.readLine();
-                queryList.add((VectorConstant) (new VectorConstant(vectorString)));
-            }
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(SiftBenchConstants.DATASET_FILE + " not found.");
-        }
-        System.out.println("SiftParamGen: " + queryList.size() + " vectors loaded.");
-    }
-
     @Override
     public SiftTransactionType getTxnType() {
         return SiftTransactionType.ANN;
     }
 
     private VectorConstant getSingleVector(int line) {
-        VectorConstant randomNoise = VectorConstant.normal(SiftBenchConstants.NUM_DIMENSION, 0, 1);
-        return (VectorConstant) queryList.get(line).add(randomNoise);
+        String vectorString;
+        try (BufferedReader br = new BufferedReader(new FileReader(SiftBenchConstants.DATASET_FILE))) {
+            for (int i = 0; i < line; i++) {
+                br.readLine();
+            }
+            vectorString = br.readLine();
+            VectorConstant randomNoise = VectorConstant.normal(SiftBenchConstants.NUM_DIMENSION, 0, 1);
+            return (VectorConstant) (new VectorConstant(vectorString)).add(randomNoise);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(SiftBenchConstants.DATASET_FILE + " not found.");
+        }
     }
 
     @Override

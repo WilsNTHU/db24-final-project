@@ -4,14 +4,16 @@ import static org.vanilladb.core.sql.Type.BIGINT;
 import static org.vanilladb.core.sql.Type.INTEGER;
 
 import java.lang.reflect.Constructor;
-
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Random;
-import java.util.Vector;
-
-import javax.management.RuntimeErrorException;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 import java.lang.Math;
 
@@ -36,9 +38,6 @@ import org.vanilladb.core.storage.record.RecordFile;
 import org.vanilladb.core.storage.record.RecordId;
 import org.vanilladb.core.storage.record.RecordPage;
 import org.vanilladb.core.storage.tx.Transaction;
-import org.vanilladb.core.storage.tx.TransactionMgr;
-import org.vanilladb.core.storage.tx.concurrency.ConcurrencyMgr;
-import org.vanilladb.core.storage.tx.concurrency.SerializableConcurrencyMgr;
 import org.vanilladb.core.util.CoreProperties;
 
 /**
@@ -118,17 +117,34 @@ public class IVFFlatIndex extends Index {
 		return sch;
 	}
 
+
 	private static Schema encodedSiftSchema() {
 		Schema sch = new Schema();
 		sch.addField("i_id", INTEGER);
 		sch.addField("i_emb", Type.VECTOR(ProductQuantizationMgr.NUM_SUBSPACES));
 		return sch;
+  }
+  
+	private class Pair {
+		double key;
+		int value;
+		public Pair(double key, int value) {
+			this.key = key;
+			this.value = value;
+		}
+		public double getKey() {
+			return key;
+		}
+		public int getValue() {
+			return value;
+		}
 	}
 
 	private int currentCentroid;
 	private RecordFile rf;
 	private boolean isBeforeFirsted;
 	private boolean isBuilding = false;
+	private Deque<Integer> centroidQueue = new ArrayDeque<>();
 
 	/**
 	 * Opens a IVF-Flat index for the specified index.
@@ -226,7 +242,7 @@ public class IVFFlatIndex extends Index {
 		System.out.println("PQ procedure succeeded");
 	}
 
-	public void buildIndex() {
+	public void buildIndex(int limit) {
 		isBuilding = true;
 		System.out.println("Built index based on IndexInfo: " + ii);
 		String tblName = ii.tableName();
@@ -237,8 +253,10 @@ public class IVFFlatIndex extends Index {
 		List<VectorConstant> populationVectors = new ArrayList<VectorConstant>();
 		List<RecordId> populationRecordIds = new ArrayList<RecordId>();
 		String fldName = fldList.get(0);
+		int populationCount = 0;
 		rf.beforeFirst();
 		while(rf.next()) {
+			++populationCount;
 			populationVectors.add((VectorConstant) rf.getVal(fldName));
 			populationRecordIds.add(rf.currentRecordId());
 		}
@@ -247,10 +265,13 @@ public class IVFFlatIndex extends Index {
 		int dimension = populationVectors.get(0).dimension();
 		// Optimization: Sampling records to perform K-Means (saves time!)
 		long totalSamples = Math.min(NUM_SAMPLES_PER_CENTROIDS * NUM_CENTROIDS, populationVectors.size());
-		int randomSeed = 0;
-		Collections.shuffle(populationVectors, new Random(randomSeed));
-		Collections.shuffle(populationRecordIds, new Random(randomSeed));
-		List<VectorConstant> samples = populationVectors.subList(0, Math.toIntExact(totalSamples));
+		List<Integer> shuffledIndex = new ArrayList<Integer>();
+		for (int i = 0; i < totalSamples; ++i)
+			shuffledIndex.add(i);
+		Collections.shuffle(shuffledIndex, new Random(0));
+		List<VectorConstant> samples = new ArrayList<>();
+		for (int sampleIdx = 0; sampleIdx < totalSamples; ++sampleIdx)
+			samples.add(populationVectors.get(shuffledIndex.get(sampleIdx)));
 		// Initialize centroids
 		numCentroids = Math.min(Math.toIntExact(totalSamples), NUM_CENTROIDS);
 		// Centroids are initialized from existing vectors
@@ -278,6 +299,60 @@ public class IVFFlatIndex extends Index {
 				centroids[centroidIndex] = meanCentroid;
 			}
 		}
+		// Assign each record to the nearest centroid
+		List<List<Integer>> clusters = new ArrayList<>();
+		for (int clusterIndex = 0; clusterIndex < numCentroids; ++clusterIndex) {
+			clusters.add(new ArrayList<Integer>());
+		}
+		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
+			int centroidId = findCentroid(populationVectors.get(populationIndex));
+			clusters.get(centroidId).add(populationIndex);
+		}
+		Set<Integer> removedCentroids = new HashSet<Integer>();
+		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
+			if (clusters.get(centroidId).size() < limit) {
+				removedCentroids.add(centroidId);
+				for (int movedPopulationIndex : clusters.get(centroidId)) {
+					int targetCentroidId = findCentroid(populationVectors.get(movedPopulationIndex), removedCentroids);
+					clusters.get(targetCentroidId).add(movedPopulationIndex);
+				}
+			}
+		}
+		int left = 0, right = 0;
+		for (; right < numCentroids; ++right) {
+			if (removedCentroids.contains(right))
+				continue;
+			clusters.set(left, clusters.get(right));
+			centroids[left++] = centroids[right];
+		}
+		numCentroids = left;
+		// Insert BlockId and RecordId into centroid inverted index files
+		for (int centroidId = 0; centroidId < numCentroids; ++centroidId) {
+			System.out.println("centroid " + centroidId + " contains " + clusters.get(centroidId).size() + " elements.");
+			String clusterName = ii.indexName() + centroidId;
+			TableInfo clusterTableInfo = new TableInfo(clusterName, schema());
+			RecordFile clusterRecordFile = clusterTableInfo.open(tx, false);
+			// Initialize the file header if needed
+			if (clusterRecordFile.fileSize() == 0)
+				RecordFile.formatFileHeader(clusterTableInfo.fileName(), tx);
+			clusterRecordFile.beforeFirst();
+			for (int populationIndex : clusters.get(centroidId)) {
+				clusterRecordFile.insert();
+				clusterRecordFile.setVal(
+					SCHEMA_RID_BLOCK, 
+					new BigIntConstant(
+						populationRecordIds.get(populationIndex).block().number()
+					)
+				);
+				clusterRecordFile.setVal(
+					SCHEMA_RID_ID,
+					new IntegerConstant(
+						populationRecordIds.get(populationIndex).id()
+					)
+				);
+			}
+			clusterRecordFile.close();
+		}
 		// Materialize each calculated centroid
 		String centroidTableName = ii.indexName() + "centroid";
 		TableInfo centroidTableInfo = VanillaDb.catalogMgr().getTableInfo(centroidTableName, tx);
@@ -290,6 +365,7 @@ public class IVFFlatIndex extends Index {
 			centroidRecordFile.insert();
 			centroidRecordFile.setVal(SCHEMA_CENTROID, centroids[centroidId]);
 		}
+
 		// Assign each record to the nearest centroid
 		for (int populationIndex = 0; populationIndex < populationVectors.size(); ++populationIndex) {
 			insert(new SearchKey(populationVectors.get(populationIndex)), populationRecordIds.get(populationIndex), false);
@@ -302,10 +378,43 @@ public class IVFFlatIndex extends Index {
 				++cnt;
 			System.out.println("Centroid " + centroidId + " has " + cnt + " entries");
 		}
+		centroidRecordFile.close();
+		System.out.println("Number of centroids " + numCentroids);
 		isBuilding = false;
 	}
 
     /**
+	 * Calculates the n-th nearest centroid and positions the index before the
+	 * first index record corresponding to the n-th nearest centroids. The hyperparameter
+	 * n is defined by the beam size.
+	 * 
+	 * @param searchRange
+	 *            the range of search keys
+	 */
+    @Override
+	public void beforeFirst(SearchRange searchRange) {
+		close();
+		if (!isBuilding && centroids == null)
+			loadCentroidsToMemory();
+		if (!searchRange.isSingleValue())
+			throw new UnsupportedOperationException();
+		if (centroidQueue.size() != 0) {
+			centroidQueue.clear();
+		}
+		processMultipleSearchRange(searchRange);
+		currentCentroid = centroidQueue.poll();
+		// Open corresponding centroid record file
+		String tblName = ii.indexName() + currentCentroid;
+		TableInfo ti = new TableInfo(tblName, schema());
+		this.rf = ti.open(tx, false);
+		// Initialize the file header if needed
+		if (rf.fileSize() == 0)
+			RecordFile.formatFileHeader(ti.fileName(), tx);
+		rf.beforeFirst();
+		isBeforeFirsted = true;
+    }
+
+	/**
 	 * Positions the index before the first index record having the specified
 	 * search key. The method uses the search key to find the best matching
 	 * centroid, and then opens a {@link RecordFile} on the file corresponding 
@@ -314,8 +423,7 @@ public class IVFFlatIndex extends Index {
 	 * @param searchRange
 	 *            the range of search keys
 	 */
-    @Override
-	public void beforeFirst(SearchRange searchRange) {
+	private void beforeFirstSingular(SearchRange searchRange) {
 		close();
 		if (!isBuilding && centroids == null)
 			loadCentroidsToMemory();
@@ -351,6 +459,36 @@ public class IVFFlatIndex extends Index {
 			return (int) searchObject.asJavaVal();
 		// The Constant object is of VectorConstant type
 		return findCentroid((VectorConstant) searchObject);
+	}
+
+	/**
+	 * Enqueues the n-th nearest centroid to the query vector. The hyperparameter
+	 * n is defined by the beam size.
+	 * 
+	 * Note: Assumes that the centroid queue is initially empty.
+	 * 
+	 * @param searchRange
+	 * @return
+	 */
+	private void processMultipleSearchRange(SearchRange searchRange) {
+		Constant searchObject = searchRange.asSearchKey().get(0);
+		// The Constant object is of Long type
+		if (searchObject.getType() == Type.INTEGER)
+			centroidQueue.add((int) searchObject.asJavaVal());
+		// The Constant object is of VectorConstant type
+		PriorityQueue<Pair> pq = new PriorityQueue<>((a, b) -> (int)(b.getKey() - a.getKey()));
+		DistanceFn distFn = getDistFn((VectorConstant) searchObject);
+		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
+			double currentDistance = distFn.distance(centroids[centroidIndex]);
+			if ((pq.size() >= BEAM_SIZE) && (currentDistance >= pq.peek().getKey()))
+				continue;
+			if (pq.size() >= BEAM_SIZE)
+				pq.poll();
+			pq.add(new Pair(currentDistance, centroidIndex));
+		}
+		// Get centorid queue
+		for (Pair p : pq)
+			centroidQueue.add(p.getValue());
 	}
 
 	/**
@@ -394,10 +532,7 @@ public class IVFFlatIndex extends Index {
     @Override
 	public void insert(SearchKey key, RecordId dataRecordId, boolean doLogicalLogging) {
 		// Search the position
-		beforeFirst(new SearchRange(key));
-		// Log the logical operation starts
-		// if (doLogicalLogging)
-		//	tx.recoveryMgr().logLogicalStart();
+		beforeFirstSingular(new SearchRange(key));
 		// Insert the data
 		rf.insert();
 		// Optimization: store the search key as the centroidId (saves space!)
@@ -406,10 +541,7 @@ public class IVFFlatIndex extends Index {
 			rf.setVal(keyFieldName(i), key.get(i));
 		rf.setVal(SCHEMA_RID_BLOCK, new BigIntConstant(dataRecordId.block().number()));
 		rf.setVal(SCHEMA_RID_ID, new IntegerConstant(dataRecordId.id()));
-		// Log the logical operation ends
-		// if (doLogicalLogging)
-		// 	tx.recoveryMgr().logIndexInsertionEnd(ii.indexName(), key, 
-		//			dataRecordId.block().number(), dataRecordId.id());
+		close();
 	}
 
 	/**
@@ -425,22 +557,15 @@ public class IVFFlatIndex extends Index {
     @Override
 	public void delete(SearchKey key, RecordId dataRecordId, boolean doLogicalLogging) {
 		// Search the position
-		beforeFirst(new SearchRange(key));
-		// Log the logical operation starts
-		if (doLogicalLogging)
-			tx.recoveryMgr().logLogicalStart();
+		beforeFirstSingular(new SearchRange(key));
 		// Delete the specified entry
 		while (next())
 			if (getDataRecordId().equals(dataRecordId)) {
 				rf.delete();
+				close();
 				return;
 			}
-		// Optimization: store the search key as the centroidId (saves space!)
-		key = new SearchKey(new IntegerConstant(currentCentroid));
-		// Log the logical operation ends
-		if (doLogicalLogging)
-			tx.recoveryMgr().logIndexDeletionEnd(ii.indexName(), key,
-					dataRecordId.block().number(), dataRecordId.id());
+		close();
     }
 
 	/**
@@ -459,42 +584,48 @@ public class IVFFlatIndex extends Index {
 	/**
 	 * Returns the centroid that best matches the query vector
 	 * 
-	 * @param searchRange
-	 *            the range of search keys
+	 * @param queryVector
+	 *            the query vector
 	 * @return the 
 	 */
 	private int findCentroid(VectorConstant queryVector) {
-		/*
 		int bestCentroid = 0;
 		double bestDistance = Double.POSITIVE_INFINITY;
 		DistanceFn distFn = getDistFn(queryVector);
 		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
 			double currentDistance = distFn.distance(centroids[centroidIndex]);
-			if (currentDistance < bestDistance) 
+			if (currentDistance < bestDistance) {
 				bestCentroid = centroidIndex;
 				bestDistance = currentDistance;
-		}
-		return bestCentroid;
-		*/
-		int bestCentroid = 0;
-		float bestDistance = Float.MAX_VALUE;
-		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
-			float distance = computeDistance(queryVector, centroids[centroidIndex]);
-			if (distance < bestDistance) {
-				bestCentroid = centroidIndex;
-				bestDistance = distance;
 			}
 		}
 		return bestCentroid;
 	}
 
-	private float computeDistance(VectorConstant v1, VectorConstant v2) {
-		float distance = 0;
-		VectorConstant subtractedVector = (VectorConstant) v1.sub(v2);
-		for (int i = 0; i < subtractedVector.dimension(); ++i) {
-			distance += subtractedVector.get(i) * subtractedVector.get(i);
+	/**
+	 * Returns the centroid that best matches the query vector, except the 
+	 * specified centroid
+	 * 
+	 * @param queryVector
+	 *            the query vector
+	 * @param excludeId
+	 * 			  the index of excluded centroid
+	 * @return the index of the best matching centroid
+	 */
+	private int findCentroid(VectorConstant queryVector, Set<Integer> excludeId) {
+		int bestCentroid = 0;
+		double bestDistance = Double.POSITIVE_INFINITY;
+		DistanceFn distFn = getDistFn(queryVector);
+		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
+			if (excludeId.contains(centroidIndex))
+				continue;
+			double currentDistance = distFn.distance(centroids[centroidIndex]);
+			if (currentDistance < bestDistance) {
+				bestCentroid = centroidIndex;
+				bestDistance = currentDistance;
+			}
 		}
-		return (float) Math.sqrt(distance);
+		return bestCentroid;
 	}
 
 	/**
