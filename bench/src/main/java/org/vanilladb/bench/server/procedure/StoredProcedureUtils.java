@@ -150,6 +150,6 @@ public class StoredProcedureUtils {
         Index index = indexInfo.open(tx);
 		index.encodeSiftTable();
         index.buildIndex(limit);
-    }
-
+	}
+        
 }

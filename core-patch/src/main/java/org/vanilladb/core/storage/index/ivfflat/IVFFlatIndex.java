@@ -123,7 +123,11 @@ public class IVFFlatIndex extends Index {
 		sch.addField("i_id", INTEGER);
 		sch.addField("i_emb", Type.VECTOR(ProductQuantizationMgr.NUM_SUBSPACES));
 		return sch;
+
 	}
+
+
+  
 
 	private class Pair {
 		double key;
@@ -198,7 +202,6 @@ public class IVFFlatIndex extends Index {
 		centroids = centroidsList.toArray(new VectorConstant[numCentroids]);
 	}	
 
-
 	public void encodeSiftTable(){
 		// Preload sift table into memory
 		String tblName = "sift";
@@ -244,10 +247,7 @@ public class IVFFlatIndex extends Index {
 		System.out.println("PQ procedure succeeded");
 	}
 
-
-
 	public void buildIndex(int limit) {
-
 		isBuilding = true;
 		System.out.println("Built index based on IndexInfo: " + ii);
 		String tblName = ii.tableName();
@@ -370,6 +370,7 @@ public class IVFFlatIndex extends Index {
 			centroidRecordFile.insert();
 			centroidRecordFile.setVal(SCHEMA_CENTROID, centroids[centroidId]);
 		}
+
 		centroidRecordFile.close();
 		System.out.println("Number of centroids " + numCentroids);
 		isBuilding = false;
