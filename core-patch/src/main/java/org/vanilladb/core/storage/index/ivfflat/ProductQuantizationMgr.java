@@ -45,6 +45,7 @@ public class ProductQuantizationMgr {
     // Split the vector into NUM_SUBSPACES subspaces
     private float[][] splitIntoSubspaces(VectorConstant vector) {
         float[] vector_vals = vector.asJavaVal();
+        int NUM_SUBSPACE_DIMENSION = vector.dimension() / NUM_SUBSPACES;
         float[][] subspaces = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
         for (int m = 0; m < NUM_SUBSPACES; m++) {
             System.arraycopy(vector_vals, m * NUM_SUBSPACE_DIMENSION, subspaces[m], 0, NUM_SUBSPACE_DIMENSION);
@@ -151,10 +152,10 @@ public class ProductQuantizationMgr {
     }
 
     public SearchKey getSearchKey(VectorConstant encodedVectors){
-        int[] pqKeys = encodedVectors.getCentroidLabels();
+        float[] pqKeys = encodedVectors.asJavaVal();
         float[][] vals = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
         for(int m=0; m < NUM_SUBSPACES; m++){
-             vals[m] = codebooks[m][pqKeys[m]]; 
+             vals[m] = codebooks[m][(int) pqKeys[m]]; 
         }
 
         Constant[] vector = new Constant[NUM_DIMENSION];
