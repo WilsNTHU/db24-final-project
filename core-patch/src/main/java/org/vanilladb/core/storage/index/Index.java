@@ -164,7 +164,7 @@ public abstract class Index {
 	/**
 	 * Trains the index (if necessary)
 	 */
-	public void buildIndex() {
+	public void buildIndex(int limit) {
 
 	}
 

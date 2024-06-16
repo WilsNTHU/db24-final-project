@@ -24,7 +24,17 @@ public class SiftInsertParamGen extends SiftParamGen {
     }
 
     private VectorConstant getSingleVector(int line) {
-        return (VectorConstant) queryList.get(line);
+        String vectorString;
+        try (BufferedReader br = new BufferedReader(new FileReader(SiftBenchConstants.DATASET_FILE))) {
+            for (int i = 0; i < line; i++) {
+                br.readLine();
+            }
+            vectorString = br.readLine();
+            return new VectorConstant(vectorString);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(SiftBenchConstants.DATASET_FILE + " not found.");
+        }
     }
 
     @Override

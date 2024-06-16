@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+.vscode/
+
+sift.txt
+=======
 ### Eclipse ###
 .settings/
 .metadata/
@@ -24,3 +29,4 @@ target/
 ### Others ###
 design
 
+>>>>>>> parent of 14cc468 (Revert "update: recall calcute method & param generate method")

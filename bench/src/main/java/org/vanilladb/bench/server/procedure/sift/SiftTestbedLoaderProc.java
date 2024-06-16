@@ -47,7 +47,7 @@ public class SiftTestbedLoaderProc extends StoredProcedure<SiftTestbedLoaderPara
             logger.info("Training IVF index...");
 
         StoredProcedureUtils.executeTrainIndex(getHelper().getTableName(), getHelper().getIdxFields(), 
-            getHelper().getIdxName(), getTransaction());
+            getHelper().getIdxName(), 20, getTransaction());
 
         
 
