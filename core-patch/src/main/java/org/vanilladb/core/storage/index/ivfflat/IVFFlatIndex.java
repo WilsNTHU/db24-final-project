@@ -219,7 +219,6 @@ public class IVFFlatIndex extends Index {
 			rf.insert();
 			rf.setVal("i_id", iids.get(index));
 			VectorConstant vec = VanillaDb.pqMgr().encodeVector(vectors.get(index));
-			System.out.println(vec);
 			rf.setVal("i_emb", vec);
 			index++;
 		}

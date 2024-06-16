@@ -41,8 +41,10 @@ public class ProductQuantizationMgr {
         System.err.println("pqMgr initialized.");
         this.NUM_SUBSPACE_DIMENSION = NUM_DIMENSION / NUM_SUBSPACES;
         this.codebooks = new float[NUM_SUBSPACES][NUM_CLUSTERS_PER_SUBSPACE][NUM_SUBSPACE_DIMENSION];
-        this.isCodeBooksGenerated = false;
+        ProductQuantizationMgr.isCodeBooksGenerated = false;
     }
+
+
 
     // Split the vector into NUM_SUBSPACES subspaces
     private float[][] splitIntoSubspaces(VectorConstant vector) {
