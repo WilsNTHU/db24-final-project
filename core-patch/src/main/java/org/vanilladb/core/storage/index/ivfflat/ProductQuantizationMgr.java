@@ -9,9 +9,14 @@ import org.vanilladb.core.server.VanillaDb;
 import org.vanilladb.core.sql.Constant;
 import org.vanilladb.core.sql.DoubleConstant;
 import org.vanilladb.core.sql.IntegerConstant;
+import org.vanilladb.core.sql.Schema;
+import org.vanilladb.core.sql.Type;
 import org.vanilladb.core.sql.VectorConstant;
 import org.vanilladb.core.storage.file.BlockId;
 import org.vanilladb.core.storage.index.SearchKey;
+import org.vanilladb.core.storage.metadata.TableInfo;
+import org.vanilladb.core.storage.record.RecordFile;
+import org.vanilladb.core.storage.tx.Transaction;
 import org.vanilladb.core.util.CoreProperties;
 
 public class ProductQuantizationMgr {
@@ -68,7 +73,7 @@ public class ProductQuantizationMgr {
 	}
 
     // Train the codebooks using k-means clustering
-    public void train(ArrayList<VectorConstant> vectors) {
+    public void train(ArrayList<VectorConstant> vectors, Transaction tx) {
         Random rand = new Random();
         for (int m = 0; m < NUM_SUBSPACES; m++) {
             float[][] subspaceData = new float[vectors.size()][NUM_SUBSPACE_DIMENSION];
@@ -109,7 +114,51 @@ public class ProductQuantizationMgr {
             } while (changed);
         }
 
+        writeCodeBooksToMemory(tx);
         isCodeBooksGenerated = true;
+    }
+
+    private void writeCodeBooksToMemory(Transaction tx){
+        for(int i=0; i<NUM_SUBSPACES; i++){
+            int index = 0;
+            String tblName = "CodeBooks" + i;
+            TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+            if (ti == null) {
+                VanillaDb.catalogMgr().createTable(tblName, codeBookSchema(), tx);
+                ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+            }
+            RecordFile rf = ti.open(tx, false);
+		    rf.beforeFirst();
+            for(int k=0; k<NUM_CLUSTERS_PER_SUBSPACE; k++){
+                rf.insert();
+                rf.setVal("i_id", new IntegerConstant(index));
+                rf.setVal("i_emb", new VectorConstant(codebooks[i][k]));
+                index++;
+            }
+            rf.close();
+        }
+    }
+
+    private void loadCodeBooksToMemory(Transaction tx){
+        for(int i=0; i<NUM_SUBSPACES; i++){
+            int index = 0;
+            String tblName = "CodeBooks" + i;
+            TableInfo ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
+            RecordFile rf = ti.open(tx, false);
+		    rf.beforeFirst();
+            int k = 0;
+            while(rf.next()){
+                this.codebooks[i][k++] = ((VectorConstant) rf.getVal("i_emb")).asJavaVal();
+            }
+            rf.close();
+        }
+    }
+
+    public Schema codeBookSchema(){
+        Schema sch = new Schema();
+		sch.addField("i_id", Type.INTEGER);
+		sch.addField("i_emb", Type.VECTOR(NUM_SUBSPACE_DIMENSION));
+		return sch;
     }
 
     // Find the nearest cluster center
@@ -147,7 +196,8 @@ public class ProductQuantizationMgr {
     }
 
     // Encode vectors using the trained codebooks
-    public VectorConstant encodeVector(VectorConstant vector) {
+    public VectorConstant encodeVector(VectorConstant vector, Transaction tx) {
+        if(this.codebooks == null) loadCodeBooksToMemory(tx);
         int[] labels = new int[NUM_SUBSPACES];
         float[][] subspaces = splitIntoSubspaces(vector);
         for (int m = 0; m < NUM_SUBSPACES; m++) {
@@ -157,7 +207,8 @@ public class ProductQuantizationMgr {
         return new VectorConstant(labels);
     }
 
-    public VectorConstant getDecodedVector(VectorConstant encodedVectors){
+    public VectorConstant getDecodedVector(VectorConstant encodedVectors, Transaction tx){
+        if(this.codebooks == null) loadCodeBooksToMemory(tx);
         float[] pqKeys = encodedVectors.asJavaVal();
         float[][] vals = new float[NUM_SUBSPACES][NUM_SUBSPACE_DIMENSION];
         for(int m=0; m < NUM_SUBSPACES; m++){
@@ -168,7 +219,7 @@ public class ProductQuantizationMgr {
         int index = 0;
         for(int i=0; i<NUM_SUBSPACES; i++)
             for(int j=0; j<NUM_SUBSPACE_DIMENSION; j++){
-                vector[index] = vals[i][j];
+                vector[index++] = vals[i][j];
             }
 
         return new VectorConstant(vector);
@@ -192,5 +243,5 @@ public class ProductQuantizationMgr {
         }
         return nearestIndex;
     }
-    
+
 }

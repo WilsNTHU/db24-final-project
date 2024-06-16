@@ -153,8 +153,11 @@ public class RecordFile implements Record {
 	 * @return the value at that field
 	 */
 	public Constant getVal(String fldName) {
-		if(fileName=="sift_pq.tbl" && fldName=="i_emb")
-			return VanillaDb.pqMgr().getDecodedVector((VectorConstant) rp.getVal(fldName));
+		if(ti.fileName()=="sift_pq.tbl" && fldName=="i_emb"){
+			System.out.println("Encoded vectore referenced");
+			return VanillaDb.pqMgr().getDecodedVector((VectorConstant) rp.getVal(fldName), tx);
+		}
+			
 		return rp.getVal(fldName);
 	}
 
@@ -175,8 +178,11 @@ public class RecordFile implements Record {
 		Constant v = val.castTo(fldType);
 		if (Page.size(v) > Page.maxSize(fldType))
 			throw new SchemaIncompatibleException();
-		if(fileName=="sift_pq.tbl" && fldName=="i_emb")
-			v = VanillaDb.pqMgr().encodeVector((VectorConstant) v);
+		if(ti.fileName()=="sift_pq.tbl" && fldName=="i_emb"){
+			System.out.println("Encoded vectore referenced");
+			v = VanillaDb.pqMgr().encodeVector((VectorConstant) v, tx);
+		}
+			
 		rp.setVal(fldName, v);
 	}
 

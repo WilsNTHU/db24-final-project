@@ -225,7 +225,7 @@ public class IVFFlatIndex extends Index {
         rf.close();
 
 		System.out.println("Start building codebooks");
-		VanillaDb.pqMgr().train(vectors);
+		VanillaDb.pqMgr().train(vectors, tx);
 		int index = 0;
 		tblName = "sift_pq";
 		ti = VanillaDb.catalogMgr().getTableInfo(tblName, tx);
@@ -239,7 +239,7 @@ public class IVFFlatIndex extends Index {
 		for(int i=0; i<vectors.size(); i++){
 			rf.insert();
 			rf.setVal("i_id", iids.get(index));
-			VectorConstant vec = VanillaDb.pqMgr().encodeVector(vectors.get(index));
+			VectorConstant vec = VanillaDb.pqMgr().encodeVector(vectors.get(index), tx);
 			rf.setVal("i_emb", vec);
 			index++;
 		}
