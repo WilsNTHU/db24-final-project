@@ -66,8 +66,12 @@ public class ProductQuantization {
     public static final int BEAM_SIZE;
     public static final int CENTROID_DIMENSION;
 
+    private static final Class<?> DIST_FN_CLS; 
+
     private static int numCentroidsInSubspace;
     private static VectorConstant[][] centroidsAllSubspace;
+
+
 
     // get static var from properties (TODO)
 
@@ -123,7 +127,7 @@ public class ProductQuantization {
 
         // find field name from keyTi (reference to IndexMgr)
 
-        this.tblName = "sift.tbl";  // should be changed
+        this.tblName = "sift";  // should be changed
 		//this.tblName = tblName;
         this.dataFileName = tblName + ".tbl";
         this.keyTi = keyTi;
@@ -210,6 +214,7 @@ public class ProductQuantization {
         for (int i =0; i < NUM_SUBSPACES; ++i) {
             VectorConstant[] centroids = new VectorConstant[numCentroidsInSubspace];
             List<VectorConstant> subSpace = subVectors.get(i);
+            centroids = subSpace.subList(0, numCentroidsInSubspace).toArray(new VectorConstant[numCentroidsInSubspace]);
 
             // Initialize centroids here...
         
@@ -221,7 +226,7 @@ public class ProductQuantization {
                 }
                 // Assign each sample to the nearest cluster
                 for (int sampleIndex = 0; sampleIndex < subSpace.size(); ++sampleIndex) {
-                    int bestCentroid = findCentroid(subSpace.get(sampleIndex));
+                    int bestCentroid = findCentroid(subSpace.get(sampleIndex), centroids);
                     clusters.get(bestCentroid).add(sampleIndex);
                 }
 
@@ -242,6 +247,25 @@ public class ProductQuantization {
 
 
     }
+
+    /**
+	 * Returns the 
+	 * @param queryVector
+	 * @return the distance function with the query vector set
+	 */
+	private DistanceFn getDistFn(VectorConstant queryVector) {
+		DistanceFn fn = null;
+		try {
+			// Parameter types
+			Class<?> cls[] = new Class[] {String.class};
+			Constructor<?> ct = DIST_FN_CLS.getConstructor(cls);
+			fn = (DistanceFn) ct.newInstance(ii.fieldNames().get(0));
+			fn.setQueryVector(queryVector);
+		} catch(Exception e) {
+			System.out.println(e);
+		}
+		return fn;
+	}
 
     
 

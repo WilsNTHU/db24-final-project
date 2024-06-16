@@ -185,6 +185,13 @@ public class IVFFlatIndex extends Index {
 		List<VectorConstant> populationVectors = new ArrayList<VectorConstant>();
 		List<RecordId> populationRecordIds = new ArrayList<RecordId>();
 		String fldName = fldList.get(0);
+		// add a for loop to print out the field names
+		System.out.println("[my debug] field names in buildIndex of IVF");
+
+		for (String name : fldList) {
+			System.out.println("Field name: " + name);
+		}
+		System.out.println("len of fldList: " + fldList.size());
 		rf.beforeFirst();
 		while(rf.next()) {
 			populationVectors.add((VectorConstant) rf.getVal(fldName));
@@ -298,6 +305,7 @@ public class IVFFlatIndex extends Index {
 		if (searchObject.getType() == Type.INTEGER)
 			return (int) searchObject.asJavaVal();
 		// The Constant object is of VectorConstant type
+		//System.out.println("[my debug] type of searchRange:"+ searchObject.getType());
 		return findCentroid((VectorConstant) searchObject);
 	}
 
@@ -412,18 +420,20 @@ public class IVFFlatIndex extends Index {
 	 * @return the 
 	 */
 	private int findCentroid(VectorConstant queryVector) {
-		/*
+		
 		int bestCentroid = 0;
 		double bestDistance = Double.POSITIVE_INFINITY;
 		DistanceFn distFn = getDistFn(queryVector);
 		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
 			double currentDistance = distFn.distance(centroids[centroidIndex]);
-			if (currentDistance < bestDistance) 
+			if (currentDistance < bestDistance) {
 				bestCentroid = centroidIndex;
 				bestDistance = currentDistance;
+			}
 		}
 		return bestCentroid;
-		*/
+		
+		/*
 		int bestCentroid = 0;
 		float bestDistance = Float.MAX_VALUE;
 		for (int centroidIndex = 0; centroidIndex < numCentroids; ++centroidIndex) {
@@ -434,6 +444,7 @@ public class IVFFlatIndex extends Index {
 			}
 		}
 		return bestCentroid;
+		*/
 	}
 
 	private float computeDistance(VectorConstant v1, VectorConstant v2) {
