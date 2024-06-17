@@ -21,13 +21,13 @@ public class NearestNeighborPlan implements Plan {
         this.distFn = distFn;
         this.limit = limit;
         this.projectFields = projectFields;
-        this.child = p;
+        this.child = new SortPlan(p, distFn, tx);
     }
 
     @Override
     public Scan open() {
         Scan s = child.open();
-        return new NearestNeighborScan(s, distFn, limit, projectFields);
+        return new NearestNeighborScan(s);
     }
 
     @Override
